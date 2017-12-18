@@ -31,7 +31,7 @@
 #include "BatchingRPC.pb.h"
 #include "Servable.hpp"
 
-namespace Serving { namespace internal {
+namespace Serving {
 
   namespace mx = mxnet::cpp;
 
@@ -81,7 +81,7 @@ namespace Serving { namespace internal {
     bool ready_to_process_ = false;
   };
 
-}} // Serving::internal
+} // Serving
 
 
 #endif //RPC_BATCH_SCHEDULER_TENSORBATCHINGSERVABLE_HPP

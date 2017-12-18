@@ -26,7 +26,7 @@
 
 #include "BatchingRPC.pb.h"
 
-namespace Serving { namespace internal {
+namespace Serving {
   enum ReturnCodes {
     OK = 1,
     NEED_BIND_CALL = 2,
@@ -40,6 +40,6 @@ namespace Serving { namespace internal {
     virtual ReturnCodes AddToBatch(TensorMessage &message, std::string client_id) = 0;
     virtual TensorMessage GetResult(std::string client_id) = 0;
   };
-}} // Serving::internal
+} // Serving
 
 #endif //RPC_BATCH_SCHEDULER_SERVABLE_HPP

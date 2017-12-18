@@ -23,7 +23,7 @@
 
 #include "MXNetServable.hpp"
 
-namespace Serving { namespace internal {
+namespace Serving {
 
   MXNetServable::MXNetServable(
           const mx::Shape &input_shape,
@@ -170,6 +170,6 @@ namespace Serving { namespace internal {
 
   }
 
-}} // Serving::internal
+} // Serving
 
 

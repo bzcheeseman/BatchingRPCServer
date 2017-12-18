@@ -102,6 +102,15 @@ namespace {
     EXPECT_NO_THROW(servable.Bind(fc, parms));
   }
 
+  TEST_F(TestMXNetServable, BindFile) { // this fails because of an issue with the params?
+    Serving::MXNetServable servable (mx::Shape(1, 3, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+
+    EXPECT_NO_THROW(servable.Bind(
+            "../../../../BatchingServer/Servable/MXNetServable/test/assets/inception-bn/Inception-BN-symbol.json",
+            "../../../../BatchingServer/Servable/MXNetServable/test/assets/inception-bn/Inception-BN-0126.params"
+    ));
+  }
+
   TEST_F(TestMXNetServable, Single) {
     Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 

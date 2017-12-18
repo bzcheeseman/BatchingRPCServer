@@ -116,7 +116,8 @@ namespace Serving {
 
   void MXNetServable::Bind(const std::string &symbol_filename, const std::string &parameters_filename) {
     servable_ = mx::Symbol::Load(symbol_filename);
-    std::map<std::string, mx::NDArray> parameters = mx::NDArray::LoadToMap(parameters_filename);
+    std::map<std::string, mx::NDArray> parameters;
+    mx::NDArray::Load(parameters_filename, nullptr, &parameters);
     LoadParameters_(parameters);
 
     executor_ = servable_.SimpleBind(ctx_, args_map_,

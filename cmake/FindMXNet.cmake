@@ -3,7 +3,7 @@
 #
 #  MXNET_FOUND - system has MXNET
 #  MXNET_INCLUDE_DIRS - the MXNET include directory
-#  MXNET_LIBRARIES - Link these to use MXNET
+#  MXNET_LIBS - Link these to use MXNET
 #
 # Copyright (c) 2017 Aman LaChapelle
 # Full license at rpc_batch_scheduler/LICENSE.txt

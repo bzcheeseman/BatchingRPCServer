@@ -34,13 +34,12 @@ namespace Serving { namespace internal {
 
     current_n_ = 0;
     current_batch_ = mx::NDArray(input_shape_, ctx_);
-    args_map_["data"] = mx::NDArray(input_shape_, ctx_);
-    args_map_["label"] = mx::NDArray(output_shape_, ctx_);
+    args_map_["input"] = mx::NDArray(input_shape_, ctx_);
 
   }
 
   MXNetServable::~MXNetServable() {
-    delete executor_;
+    if (bind_called_) delete executor_;
   }
 
   ReturnCodes MXNetServable::AddToBatch(TensorMessage &message, std::string client_id) {
@@ -74,9 +73,7 @@ namespace Serving { namespace internal {
                                ctx_);
 
     current_batch_.Slice(current_n_, current_n_+message.n()) = 0.f;
-    std::cout << current_batch_.Slice(current_n_, current_n_+message.n()) << std::endl;
     current_batch_.Slice(current_n_, current_n_+message.n()) += message_array;
-    std::cout << current_batch_.Slice(current_n_, current_n_+message.n()) << std::endl;
 
     if (ready_to_process_) {
       ProcessCurrentBatch_();
@@ -144,7 +141,8 @@ namespace Serving { namespace internal {
   }
 
   void MXNetServable::ProcessCurrentBatch_() {
-    current_batch_.CopyTo(&args_map_["data"]);
+
+    current_batch_.CopyTo(&args_map_["input"]);
 
     executor_->Forward(false);
 

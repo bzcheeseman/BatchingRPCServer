@@ -73,8 +73,8 @@ namespace Serving { namespace internal {
     mx::Context ctx_;
     mx::Symbol servable_; // see feature_extract.cpp for how to load models from files
     mx::Executor *executor_;
-    std::map<std::string, mx::NDArray> args_map_;
-    std::map<std::string, mx::NDArray> aux_map_;
+    std::map<std::string, mx::NDArray> args_map_; // inputs (data and model parameters) are args
+    std::map<std::string, mx::NDArray> aux_map_; // everyone else is aux
 
     // Serving vars
     bool ready_to_process_ = false;

@@ -34,20 +34,17 @@ namespace {
   namespace mx = mxnet::cpp;
 
   mx::Symbol SimpleSymbolFactory(int n_hidden) {
-    mx::Symbol data = mx::Symbol::Variable("data");
+    mx::Symbol data = mx::Symbol::Variable("input");
     mx::Symbol m = mx::Symbol::Variable("m");
     mx::Symbol b = mx::Symbol::Variable("b");
 
-    mx::Symbol result = mx::FullyConnected(data, m, b, n_hidden);
+    mx::Symbol result = mx::FullyConnected("fc1", data, m, b, n_hidden);
 
     return result;
   }
 
   Serving::TensorMessage ToMessage(mx::NDArray &arr) {
     std::vector<mx_uint> result_shape = arr.GetShape();
-
-    std::cout << arr.Size() << std::endl;
-    std::cout << arr << std::endl;
 
     Serving::TensorMessage message;
     google::protobuf::RepeatedField<float> data(arr.GetData(), arr.GetData()+arr.Size());
@@ -57,7 +54,7 @@ namespace {
     message.set_k(result_shape[1]);
     message.set_nr(result_shape[2]);
     message.set_nc(result_shape[3]);
-    message.set_name("sample_input");
+    message.set_name("input");
 
     return message;
   }
@@ -71,21 +68,15 @@ namespace {
 
       fc = SimpleSymbolFactory(n_hidden);
 
-      mx::NDArray m (mx::Shape(1, 1, n_hidden, n_hidden), *ctx);
+      mx::NDArray m (mx::Shape(n_hidden, n_hidden), *ctx);
       m = 2.f;
       parms["arg:m"] = m;
-      mx::NDArray b (mx::Shape(1, 1, 1, n_hidden), *ctx);
+      mx::NDArray b (mx::Shape(n_hidden), *ctx);
       b = 1.f;
       parms["arg:b"] = b;
 
-      m = 1.f;
-      parms_noop["arg:m"] = m;
-      b = 0.f;
-      parms_noop["arg:b"] = b;
-
       input = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
       input = 1.f;
-      std::cout << input << std::endl;
 
     }
 
@@ -94,30 +85,36 @@ namespace {
     }
 
     mx::Context *ctx;
-    int n_hidden = 5;
+    int n_hidden = 600;
     mx::Symbol fc;
     std::map<std::string, mx::NDArray> parms;
-    std::map<std::string, mx::NDArray> parms_noop;
     mx::NDArray input;
 
   };
 
+  TEST_F(TestMXNetServable, Bind) {
+    Serving::internal::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, 1, 1, n_hidden), mx::kCPU, 1);
+
+    servable.Bind(fc, parms);
+
+    EXPECT_NO_THROW();
+  }
+
   TEST_F(TestMXNetServable, Single) {
     Serving::internal::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, 1, 1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms_noop);
+    servable.Bind(fc, parms);
 
     Serving::TensorMessage msg = ToMessage(input);
 
-    servable.AddToBatch(msg, "test");
+    Serving::internal::ReturnCodes r = servable.AddToBatch(msg, "test");
+    EXPECT_EQ(r, Serving::internal::ReturnCodes::OK);
 
     Serving::TensorMessage output = servable.GetResult("test");
-//    std::string test_result = "test_result";
-//    EXPECT_STREQ(output.name(), test_result);
 
     int buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), msg.buffer(i));
+      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
     }
 
   }

@@ -78,6 +78,9 @@ namespace {
       input = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
       input = 1.f;
 
+      zeros = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
+      zeros = 0.f;
+
     }
 
     void TearDown() override {
@@ -89,19 +92,18 @@ namespace {
     mx::Symbol fc;
     std::map<std::string, mx::NDArray> parms;
     mx::NDArray input;
+    mx::NDArray zeros;
 
   };
 
   TEST_F(TestMXNetServable, Bind) {
-    Serving::internal::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, 1, 1, n_hidden), mx::kCPU, 1);
+    Serving::internal::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
-
-    EXPECT_NO_THROW();
+    EXPECT_NO_THROW(servable.Bind(fc, parms));
   }
 
   TEST_F(TestMXNetServable, Single) {
-    Serving::internal::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, 1, 1, n_hidden), mx::kCPU, 1);
+    Serving::internal::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
     servable.Bind(fc, parms);
 
@@ -118,9 +120,67 @@ namespace {
     }
 
   }
-}
 
-// TODO: write the rest of the tests
+  TEST_F(TestMXNetServable, Multiple) {
+    Serving::internal::MXNetServable servable (mx::Shape(2, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+
+    servable.Bind(fc, parms);
+
+    Serving::TensorMessage msg = ToMessage(input);
+
+    Serving::internal::ReturnCodes r1 = servable.AddToBatch(msg, "test");
+    EXPECT_EQ(r1, Serving::internal::ReturnCodes::OK);
+    Serving::internal::ReturnCodes r2 = servable.AddToBatch(msg, "test");
+    EXPECT_EQ(r2, Serving::internal::ReturnCodes::OK);
+
+
+    Serving::TensorMessage output = servable.GetResult("test");
+
+    EXPECT_EQ(output.n(), 2);
+
+    int buflen = msg.buffer().size();
+    for (int i = 0; i < buflen; i++) {
+      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
+    }
+
+  }
+
+  TEST_F(TestMXNetServable, MultipleClients) {
+    Serving::internal::MXNetServable servable (mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+
+    servable.Bind(fc, parms);
+
+    Serving::TensorMessage msg = ToMessage(input);
+    Serving::TensorMessage z = ToMessage(zeros);
+
+    Serving::internal::ReturnCodes r1 = servable.AddToBatch(msg, "test");
+    EXPECT_EQ(r1, Serving::internal::ReturnCodes::OK);
+    Serving::internal::ReturnCodes r2 = servable.AddToBatch(msg, "test");
+    EXPECT_EQ(r2, Serving::internal::ReturnCodes::OK);
+    Serving::internal::ReturnCodes r3 = servable.AddToBatch(z, "zeros");
+    EXPECT_EQ(r3, Serving::internal::ReturnCodes::OK);
+
+    Serving::TensorMessage output;
+    int buflen;
+
+    output = servable.GetResult("zeros");
+    EXPECT_EQ(output.n(), 1);
+    buflen = msg.buffer().size();
+    for (int i = 0; i < buflen; i++) {
+      EXPECT_EQ(output.buffer(i), 1.f);
+    }
+
+    output = servable.GetResult("test");
+    EXPECT_EQ(output.n(), 2);
+    buflen = msg.buffer().size();
+    for (int i = 0; i < buflen; i++) {
+      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
+    }
+
+  }
+
+  // TODO: Add failure tests
+}
 
 
 

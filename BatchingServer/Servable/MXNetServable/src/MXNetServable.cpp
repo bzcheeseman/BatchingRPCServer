@@ -66,7 +66,9 @@ namespace Serving { namespace internal {
       ready_to_process_ = true;
     }
 
-    idx_by_client_[client_id] = std::make_pair(current_n_, current_n_+message.n());
+    for (int i = 0; i < message.n(); i++) {
+      UpdateClientIDX(client_id, current_n_+i);
+    }
 
     mx::NDArray message_array (message.buffer().data(),
                                mx::Shape(message.n(), input_shape_[1], input_shape_[2], input_shape_[3]),
@@ -74,6 +76,7 @@ namespace Serving { namespace internal {
 
     current_batch_.Slice(current_n_, current_n_+message.n()) = 0.f;
     current_batch_.Slice(current_n_, current_n_+message.n()) += message_array;
+    current_n_ += message.n();
 
     if (ready_to_process_) {
       ProcessCurrentBatch_();
@@ -125,6 +128,10 @@ namespace Serving { namespace internal {
 
   // Private methods //
 
+  void MXNetServable::UpdateClientIDX(std::string &client_id, mx_uint &&msg_n) {
+    idx_by_client_[client_id].push_back(msg_n);
+  }
+
   void MXNetServable::LoadParameters_(std::map<std::string, mx::NDArray> &parameters) {
     for (const auto &k : parameters) {
       if (k.first.substr(0, 4) == "aux:") {
@@ -149,8 +156,12 @@ namespace Serving { namespace internal {
     mx::NDArray &result = executor_->outputs[0];
     mx::NDArray::WaitAll();
 
-    for (auto &client_idx_pair: idx_by_client_) {
-      result_by_client_[client_idx_pair.first] = result.Slice(client_idx_pair.second.first, client_idx_pair.second.second);
+    for (auto &client_idx: idx_by_client_) {
+      result_by_client_[client_idx.first] = mx::NDArray(mx::Shape(client_idx.second.size(), output_shape_[1]), ctx_);
+      result_by_client_[client_idx.first] = 0.f;
+      for (int i = 0; i < client_idx.second.size(); i++) {
+        result_by_client_[client_idx.first].Slice(i, i+1) += result.Slice(client_idx.second[i], client_idx.second[i]+1);
+      }
     }
 
     // Reset everyone
@@ -158,6 +169,7 @@ namespace Serving { namespace internal {
     ready_to_process_ = false;
 
   }
+
 }} // Serving::internal
 
 

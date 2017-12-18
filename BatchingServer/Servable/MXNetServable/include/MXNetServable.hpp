@@ -55,6 +55,7 @@ namespace Serving { namespace internal {
 
   private:
 
+    void UpdateClientIDX(std::string &client_id, mx_uint &&msg_n);
     void LoadParameters_(std::map<std::string, mx::NDArray> &parameters);
     void ProcessCurrentBatch_();
 
@@ -64,7 +65,7 @@ namespace Serving { namespace internal {
     mx::Shape output_shape_;
 
     // Information for processing
-    std::map<std::string, std::pair<mx_uint, mx_uint>> idx_by_client_;
+    std::map<std::string, std::vector<mx_uint>> idx_by_client_;
     mx_uint current_n_;
     mx::NDArray current_batch_;
     std::map<std::string, mx::NDArray> result_by_client_;

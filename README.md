@@ -1,3 +1,2 @@
 ### BatchingRPCServer
-Building an interface that allows a GPU application to be served using a batching
-strategy.
+Building a tool to serve GPU-enabled tools by batching requests and processing them at once.

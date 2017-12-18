@@ -51,15 +51,7 @@ find_library(MXNET_LIBRARY
         PATHS $ENV{MXNET_ROOT}/lib
 )
 
-#find_library(DMLC_LIBRARY
-#        NAMES dmlc
-#)
-
-find_package(opencv 3 REQUIRED)
-
 list(APPEND MXNET_LIBS ${MXNET_LIBRARY})
-#list(APPEND MXNET_LIBS ${DMLC_LIBRARY})
-#list(APPEND MXNET_LIBS ${OpenCV_LIBS})
 
 set(MXNET_FOUND TRUE)
 

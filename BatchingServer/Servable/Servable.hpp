@@ -24,7 +24,7 @@
 #ifndef RPC_BATCH_SCHEDULER_SERVABLE_HPP
 #define RPC_BATCH_SCHEDULER_SERVABLE_HPP
 
-#include "TensorMessage.pb.h"
+#include "BatchingRPC.pb.h"
 
 namespace Serving { namespace internal {
   enum ReturnCodes {

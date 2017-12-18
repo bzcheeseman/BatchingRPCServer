@@ -24,7 +24,7 @@
 
 #include "mxnet-cpp/MxNetCpp.h"
 
-#include "TensorMessage.pb.h"
+#include "BatchingRPC.pb.h"
 #include "Servable.hpp"
 #include "MXNetServable.hpp"
 

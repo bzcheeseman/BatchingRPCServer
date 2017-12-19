@@ -34,7 +34,7 @@ namespace {
   namespace mx = mxnet::cpp;
 
   mx::Symbol SimpleSymbolFactory(int n_hidden) {
-    mx::Symbol data = mx::Symbol::Variable("input");
+    mx::Symbol data = mx::Symbol::Variable("data");
     mx::Symbol m = mx::Symbol::Variable("m");
     mx::Symbol b = mx::Symbol::Variable("b");
 
@@ -54,7 +54,7 @@ namespace {
     message.set_k(result_shape[1]);
     message.set_nr(result_shape[2]);
     message.set_nc(result_shape[3]);
-    message.set_name("input");
+    message.set_name("data");
 
     return message;
   }
@@ -102,12 +102,12 @@ namespace {
     EXPECT_NO_THROW(servable.Bind(fc, parms));
   }
 
-  TEST_F(TestMXNetServable, BindFile) { // this fails because of an issue with the params?
-    Serving::MXNetServable servable (mx::Shape(1, 3, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+  TEST_F(TestMXNetServable, BindFile) { // BN loading fails for some reason
+    Serving::MXNetServable servable (mx::Shape(16, 3, 256, 256), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
     EXPECT_NO_THROW(servable.Bind(
-            "../../../../BatchingServer/Servable/MXNetServable/test/assets/inception-bn/Inception-BN-symbol.json",
-            "../../../../BatchingServer/Servable/MXNetServable/test/assets/inception-bn/Inception-BN-0126.params"
+            "../../../../BatchingServer/Servable/MXNetServable/test/assets/squeezenet_v1.1-symbol.json",
+            "../../../../BatchingServer/Servable/MXNetServable/test/assets/squeezenet_v1.1-0000.params"
     ));
   }
 

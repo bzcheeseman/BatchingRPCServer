@@ -34,7 +34,7 @@ namespace Serving {
 
     current_n_ = 0;
     current_batch_ = mx::NDArray(input_shape_, ctx_);
-    args_map_["input"] = mx::NDArray(input_shape_, ctx_);
+    args_map_["data"] = mx::NDArray(input_shape_, ctx_);
 
   }
 
@@ -116,6 +116,7 @@ namespace Serving {
 
   void MXNetServable::Bind(const std::string &symbol_filename, const std::string &parameters_filename) {
     servable_ = mx::Symbol::Load(symbol_filename);
+    servable_.InferArgsMap(ctx_, &args_map_, args_map_);
     std::map<std::string, mx::NDArray> parameters;
     mx::NDArray::Load(parameters_filename, nullptr, &parameters);
     LoadParameters_(parameters);
@@ -150,7 +151,7 @@ namespace Serving {
 
   void MXNetServable::ProcessCurrentBatch_() {
 
-    current_batch_.CopyTo(&args_map_["input"]);
+    current_batch_.CopyTo(&args_map_["data"]);
 
     executor_->Forward(false);
 

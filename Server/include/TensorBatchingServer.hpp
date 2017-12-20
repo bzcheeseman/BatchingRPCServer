@@ -31,8 +31,8 @@
 #include <thread>
 #include "Servable.hpp"
 
-#include "TensorMessage.pb.h"
-#include "TensorMessage.grpc.pb.h"
+#include "BatchingRPC.pb.h"
+#include "BatchingRPC.grpc.pb.h"
 
 namespace Serving {
   class TBServer final {

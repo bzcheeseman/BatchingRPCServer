@@ -11,6 +11,7 @@ file(GLOB proto_files ${CMAKE_SOURCE_DIR}/proto/*.proto)
 
 protobuf_generate_cpp(ProtoSources ProtoHeaders ${proto_files})
 grpc_generate_cpp(GrpcSources GrpcHeaders ${CMAKE_CURRENT_BINARY_DIR} ${proto_files})
+message(STATUS ${GrpcHeaders})
 
 file(GLOB batching_server_src src/*.cpp)
 file(GLOB batching_server_include include/*.hpp)

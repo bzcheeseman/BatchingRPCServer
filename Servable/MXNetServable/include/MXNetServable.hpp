@@ -1,9 +1,9 @@
 //
 // Created by Aman LaChapelle on 11/5/17.
 //
-// rpc_batch_scheduler
+// BatchingRPCServer
 // Copyright (c) 2017 Aman LaChapelle
-// Full license at rpc_batch_scheduler/LICENSE.txt
+// Full license at BatchingRPCServer/LICENSE.txt
 //
 
 /*
@@ -21,8 +21,8 @@
  */
 
 
-#ifndef RPC_BATCH_SCHEDULER_TENSORBATCHINGSERVABLE_HPP
-#define RPC_BATCH_SCHEDULER_TENSORBATCHINGSERVABLE_HPP
+#ifndef BATCHING_RPC_SERVER_TENSORBATCHINGSERVABLE_HPP
+#define BATCHING_RPC_SERVER_TENSORBATCHINGSERVABLE_HPP
 
 #include <map>
 
@@ -84,4 +84,4 @@ namespace Serving {
 } // Serving
 
 
-#endif //RPC_BATCH_SCHEDULER_TENSORBATCHINGSERVABLE_HPP
+#endif //BATCHING_RPC_SERVER_TENSORBATCHINGSERVABLE_HPP

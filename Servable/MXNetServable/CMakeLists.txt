@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(rpc_batch_scheduler C CXX)
+project(BatchingRPCServer C CXX)
 
 ######### MXNET #########
 find_package(MXNet REQUIRED)

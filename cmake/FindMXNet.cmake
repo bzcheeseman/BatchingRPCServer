@@ -6,7 +6,7 @@
 #  MXNET_LIBS - Link these to use MXNET
 #
 # Copyright (c) 2017 Aman LaChapelle
-# Full license at rpc_batch_scheduler/LICENSE.txt
+# Full license at BatchingRPCServer/LICENSE.txt
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

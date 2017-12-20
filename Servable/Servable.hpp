@@ -1,9 +1,9 @@
 //
 // Created by Aman LaChapelle on 11/4/17.
 //
-// rpc_batch_scheduler
+// BatchingRPCServer
 // Copyright (c) 2017 Aman LaChapelle
-// Full license at rpc_batch_scheduler/LICENSE.txt
+// Full license at BatchingRPCServer/LICENSE.txt
 //
 
 /*
@@ -21,8 +21,8 @@
  */
 
 
-#ifndef RPC_BATCH_SCHEDULER_SERVABLE_HPP
-#define RPC_BATCH_SCHEDULER_SERVABLE_HPP
+#ifndef BATCHING_RPC_SERVER_SERVABLE_HPP
+#define BATCHING_RPC_SERVER_SERVABLE_HPP
 
 #include "BatchingRPC.pb.h"
 
@@ -42,4 +42,4 @@ namespace Serving {
   };
 } // Serving
 
-#endif //RPC_BATCH_SCHEDULER_SERVABLE_HPP
+#endif //BATCHING_RPC_SERVER_SERVABLE_HPP

@@ -1,9 +1,9 @@
 //
 // Created by Aman LaChapelle on 11/4/17.
 //
-// rpc_batch_scheduler
+// BatchingRPCServer
 // Copyright (c) 2017 Aman LaChapelle
-// Full license at rpc_batch_scheduler/LICENSE.txt
+// Full license at BatchingRPCServer/LICENSE.txt
 //
 
 /*

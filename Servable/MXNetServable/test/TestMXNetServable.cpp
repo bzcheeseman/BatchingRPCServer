@@ -106,8 +106,8 @@ namespace {
     Serving::MXNetServable servable (mx::Shape(16, 3, 256, 256), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
     EXPECT_NO_THROW(servable.Bind(
-            "../../../../BatchingServer/Servable/MXNetServable/test/assets/squeezenet_v1.1-symbol.json",
-            "../../../../BatchingServer/Servable/MXNetServable/test/assets/squeezenet_v1.1-0000.params"
+            "../../../Servable/MXNetServable/test/assets/squeezenet_v1.1-symbol.json",
+            "../../../Servable/MXNetServable/test/assets/squeezenet_v1.1-0000.params"
     ));
   }
 

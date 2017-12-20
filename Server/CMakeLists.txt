@@ -3,8 +3,6 @@ project(rpc_batch_scheduler C CXX)
 
 set(CMAKE_FIND_FRAMEWORK LAST)
 
-add_subdirectory(Servable)
-
 find_package(protobuf 3.5 REQUIRED)
 find_package(GRPC 1.5 REQUIRED)
 find_package(UUID 1.5 REQUIRED)
@@ -24,5 +22,9 @@ add_library(batching_server SHARED
 )
 target_link_libraries(batching_server gRPC::grpc gRPC::grpc++ ${PROTOBUF_LIBRARIES})
 target_include_directories(batching_server
-        PUBLIC include ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../Servable ${UUID_INCLUDE_DIRS}
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../Servable ${UUID_INCLUDE_DIRS}
 )
+
+add_gtest(TensorBatchingServer batching_server)

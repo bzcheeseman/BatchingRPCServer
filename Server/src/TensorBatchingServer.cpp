@@ -42,7 +42,7 @@ namespace Serving {
     ProcessCallData(
             BatchingServable::AsyncService *service,
             grpc::ServerCompletionQueue *cq,
-            internal::Servable *servable
+            Servable *servable
     ) : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE), servable_(servable) {
 
       auto cid_iter = ctx_.client_metadata().find("client_id");
@@ -70,29 +70,29 @@ namespace Serving {
 
         new ProcessCallData(service_, cq_, servable_);
 
-        internal::ReturnCodes code = servable_->AddToBatch(request_, client_id_); // Add to batch and move to the next stage
+        ReturnCodes code = servable_->AddToBatch(request_, client_id_); // Add to batch and move to the next stage
 
         switch (code) {
-          case internal::OK: break;
-          case internal::NEED_BIND_CALL: {
+          case OK: break;
+          case NEED_BIND_CALL: {
             grpc::Status early_exit_status (grpc::FAILED_PRECONDITION, "Bind not called on servable");
             status_ = FINISH;
             responder_.FinishWithError(early_exit_status, this);
             break;
           }
-          case internal::SHAPE_INCORRECT: {
+          case SHAPE_INCORRECT: {
             grpc::Status early_exit_status (grpc::INVALID_ARGUMENT, "Input tensor shape incorrect");
             status_ = FINISH;
             responder_.FinishWithError(early_exit_status, this);
             break;
           }
-          case internal::NEXT_BATCH: {
+          case NEXT_BATCH: {
             grpc::Status early_exit_status (grpc::UNAVAILABLE, "Attempted to add to already full batch");
             status_ = FINISH;
             responder_.FinishWithError(early_exit_status, this);
             break;
           }
-          case internal::BATCH_TOO_LARGE: {
+          case BATCH_TOO_LARGE: {
             grpc::Status early_exit_status (grpc::INVALID_ARGUMENT, "Batch request was too large, split into smaller pieces and retry");
             status_ = FINISH;
             responder_.FinishWithError(early_exit_status, this);
@@ -124,7 +124,7 @@ namespace Serving {
 
     grpc::ServerAsyncResponseWriter<TensorMessage> responder_;
 
-    internal::Servable *servable_;
+    Servable *servable_;
 
     enum CallStatus { CREATE, PROCESS, RESULT, FINISH };
     CallStatus status_;
@@ -183,7 +183,7 @@ namespace Serving {
   };
 
   TBServer::TBServer(
-          internal::Servable *servable
+          Servable *servable
   ): servable_(servable) {
     ;
   }

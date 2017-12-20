@@ -37,7 +37,7 @@
 namespace Serving {
   class TBServer final {
   public:
-    explicit TBServer(internal::Servable *servable);
+    explicit TBServer(Servable *servable);
 
     ~TBServer();
 
@@ -51,7 +51,7 @@ namespace Serving {
     BatchingServable::AsyncService service_;
     std::unique_ptr<grpc::Server> server_;
 
-    internal::Servable *servable_;
+    Servable *servable_;
   };
 }
 

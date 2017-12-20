@@ -25,14 +25,4 @@ target_include_directories(mx_servable
                ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
-set(GTEST_CFG ${CMAKE_MODULE_PATH})
-set(GTEST_PREFIX ${CMAKE_CURRENT_BINARY_DIR})
-include(AddGTest)
-
-macro(add_gtest test_name lib)
-    add_executable(Test${test_name} ${CMAKE_CURRENT_SOURCE_DIR}/test/Test${test_name}.cpp)
-    target_link_libraries(Test${test_name} gtest_main ${lib})
-    add_test(NAME Test${test_name} COMMAND Test${test_name})
-endmacro()
-
 add_gtest(MXNetServable mx_servable)

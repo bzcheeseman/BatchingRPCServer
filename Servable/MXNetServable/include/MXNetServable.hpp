@@ -21,8 +21,8 @@
  */
 
 
-#ifndef BATCHING_RPC_SERVER_TENSORBATCHINGSERVABLE_HPP
-#define BATCHING_RPC_SERVER_TENSORBATCHINGSERVABLE_HPP
+#ifndef BATCHING_RPC_SERVER_MXNETSERVABLE_HPP
+#define BATCHING_RPC_SERVER_MXNETSERVABLE_HPP
 
 // STL
 #include <map>
@@ -49,7 +49,9 @@ namespace Serving {
             const int &device_id
     );
 
-    ~MXNetServable();
+    ~MXNetServable() override ;
+
+    ReturnCodes UpdateBatchSize(const int &new_size) override ;
 
     ReturnCodes AddToBatch(const TensorMessage &message) override;
 
@@ -60,6 +62,7 @@ namespace Serving {
 
   private:
 
+    void BindExecutor_();
     void UpdateClientIDX_(const std::string &client_id, mx_uint &&msg_n);
     void LoadParameters_(std::map<std::string, mx::NDArray> &parameters);
     void ProcessCurrentBatch_();
@@ -89,4 +92,4 @@ namespace Serving {
 } // Serving
 
 
-#endif //BATCHING_RPC_SERVER_TENSORBATCHINGSERVABLE_HPP
+#endif //BATCHING_RPC_SERVER_MXNETSERVABLE_HPP

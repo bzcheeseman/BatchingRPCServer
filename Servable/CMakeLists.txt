@@ -3,4 +3,3 @@ project(BatchingRPCServer C CXX)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_subdirectory(MXNetServable)
-#add_subdirectory(ArrayfireServable)

@@ -39,6 +39,7 @@ namespace Serving {
   class Servable {
   public:
     virtual ~Servable() = 0;
+    virtual ReturnCodes UpdateBatchSize(const int &new_size) = 0;
     virtual ReturnCodes AddToBatch(const TensorMessage &message) = 0;
     virtual TensorMessage GetResult(std::string client_id) = 0;
   };
@@ -47,5 +48,7 @@ namespace Serving {
     ;
   }
 } // Serving
+
+#include "MXNetServable/include/MXNetServable.hpp"
 
 #endif //BATCHING_RPC_SERVER_SERVABLE_HPP

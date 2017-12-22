@@ -36,6 +36,12 @@ message ConnectionReply {
     string client_id = 1;
 }
 
+message AdminRequest {
+    int32 new_batch_size = 1;
+}
+
+message AdminReply {}
+
 /*
     The protocol is:
      - Send Connect call
@@ -45,5 +51,6 @@ message ConnectionReply {
 service BatchingServable {
     rpc Connect(ConnectionRequest) returns (ConnectionReply) {}
     rpc Process (TensorMessage) returns (TensorMessage) {}
+    rpc SetBatchSize(AdminRequest) returns (AdminReply) {}
     // TODO: add admin endpoints for things like updating batch size, servable, etc.
 }

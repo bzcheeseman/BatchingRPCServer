@@ -36,6 +36,10 @@ namespace Serving {
       EchoServable() = default;
       ~EchoServable() override = default;
 
+      ReturnCodes UpdateBatchSize(const int &new_size) override {
+        return OK;
+      }
+
       ReturnCodes AddToBatch(const TensorMessage &message) override {
         msg = message;
         return OK;
@@ -93,6 +97,21 @@ namespace Serving {
 
       EXPECT_TRUE(status.ok());
       EXPECT_FALSE(rep.client_id().empty());
+    }
+
+    TEST_F(TestTensorBatchingServer, SetBatchSize) {
+      std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
+      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+
+      grpc::ClientContext context;
+
+      AdminRequest req;
+      req.set_new_batch_size(5);
+      AdminReply rep;
+
+      grpc::Status status = stub->SetBatchSize(&context, req, &rep);
+
+      EXPECT_TRUE(status.ok());
     }
 
     TEST_F(TestTensorBatchingServer, Process) {

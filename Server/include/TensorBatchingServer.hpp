@@ -46,7 +46,8 @@ namespace Serving {
   public:
     explicit TBServer(Servable *servable);
     ~TBServer() override ;
-
+    
+    grpc::Status SetBatchSize(grpc::ServerContext *ctx, const AdminRequest *req, AdminReply *rep) override ;
     grpc::Status Connect(grpc::ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) override ;
     grpc::Status Process(grpc::ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) override ;
 

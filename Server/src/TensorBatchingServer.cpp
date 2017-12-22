@@ -43,6 +43,20 @@ namespace Serving {
     ;
   }
 
+  grpc::Status TBServer::SetBatchSize(grpc::ServerContext *ctx, const AdminRequest *req, AdminReply *rep) {
+    ReturnCodes code = servable_->UpdateBatchSize(req->new_batch_size());
+
+    switch (code) {
+      case OK: break;
+      case NEXT_BATCH: {
+        grpc::Status early_exit_status (grpc::UNAVAILABLE, "Batch is already larger than requested size, retry");
+        return early_exit_status;
+      }
+    }
+
+    return grpc::Status::OK;
+  }
+
   Status TBServer::Connect(ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) {
 
     uuid_t uuid;

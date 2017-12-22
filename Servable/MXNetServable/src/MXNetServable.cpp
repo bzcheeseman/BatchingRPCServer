@@ -42,6 +42,32 @@ namespace Serving {
     if (bind_called_) delete executor_;
   }
 
+  ReturnCodes MXNetServable::UpdateBatchSize(const int &new_size) {
+    if (new_size <= current_n_) {
+      return NEXT_BATCH;
+    }
+
+    int old_n = input_shape_[0];
+    // Reshape the input
+    input_shape_ = mx::Shape(new_size, input_shape_[1], input_shape_[2], input_shape_[3]);
+    mx::NDArray new_current_batch = mx::NDArray(input_shape_, ctx_);
+    new_current_batch = 0.f;
+
+    // Copy over current items
+    new_current_batch.Slice(0, old_n) += current_batch_;
+
+    // Do the swap
+    current_batch_ = mx::NDArray(input_shape_, ctx_);
+    new_current_batch.CopyTo(&current_batch_);
+
+    // Re-bind the executor with the new batch size
+    args_map_["data"] = mx::NDArray(input_shape_, ctx_);
+    BindExecutor_();
+
+    return OK;
+
+  }
+
   ReturnCodes MXNetServable::AddToBatch(const TensorMessage &message) {
 
     if (!bind_called_) {
@@ -57,12 +83,11 @@ namespace Serving {
     }
 
     if (message.n() + current_n_ > input_shape_[0]) { // early exit if we've got almost enough stuff here
-      ready_to_process_ = true;
       ProcessCurrentBatch_();
       return ReturnCodes::NEXT_BATCH;
     }
 
-    if (message.n() + current_n_ == input_shape_[0]) {
+    if (message.n() + current_n_ == input_shape_[0]) { // we will be ready once this batch goes in
       ready_to_process_ = true;
     }
 
@@ -106,29 +131,26 @@ namespace Serving {
   void MXNetServable::Bind(mx::Symbol &net, std::map<std::string, mx::NDArray> &parameters) {
     servable_ = net;
     LoadParameters_(parameters);
-
-    executor_ = servable_.SimpleBind(ctx_, args_map_,
-                                     std::map<std::string, mx::NDArray>(), std::map<std::string, mx::OpReqType>(),
-                                     aux_map_);
-
-    bind_called_ = true;
+    BindExecutor_();
   }
 
   void MXNetServable::Bind(const std::string &symbol_filename, const std::string &parameters_filename) {
     servable_ = mx::Symbol::Load(symbol_filename);
-    servable_.InferArgsMap(ctx_, &args_map_, args_map_);
-    std::map<std::string, mx::NDArray> parameters;
-    mx::NDArray::Load(parameters_filename, nullptr, &parameters);
-    LoadParameters_(parameters);
 
+    std::map<std::string, mx::NDArray> parameters = mx::NDArray::LoadToMap(parameters_filename);
+    LoadParameters_(parameters);
+    BindExecutor_();
+  }
+
+  // Private methods //
+
+  void MXNetServable::BindExecutor_() {
     executor_ = servable_.SimpleBind(ctx_, args_map_,
                                      std::map<std::string, mx::NDArray>(), std::map<std::string, mx::OpReqType>(),
                                      aux_map_);
 
     bind_called_ = true;
   }
-
-  // Private methods //
 
   void MXNetServable::UpdateClientIDX_(const std::string &client_id, mx_uint &&msg_n) {
     idx_by_client_[client_id].push_back(msg_n);

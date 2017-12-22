@@ -37,9 +37,14 @@ namespace Serving {
 
   class Servable {
   public:
-    virtual ReturnCodes AddToBatch(TensorMessage &message, std::string client_id) = 0;
+    virtual ~Servable() = 0;
+    virtual ReturnCodes AddToBatch(const TensorMessage &message, std::string client_id) = 0;
     virtual TensorMessage GetResult(std::string client_id) = 0;
   };
+
+  Servable::~Servable() {
+    ;
+  }
 } // Serving
 
 #endif //BATCHING_RPC_SERVER_SERVABLE_HPP

@@ -35,20 +35,19 @@
 #include "BatchingRPC.grpc.pb.h"
 
 namespace Serving {
-  class TBServer final {
+  class TBServer final : public BatchingServable::Service {
   public:
     explicit TBServer(Servable *servable);
+    ~TBServer() override ;
 
-    ~TBServer();
+    grpc::Status Connect(grpc::ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) override ;
+    grpc::Status Process(grpc::ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) override ;
 
-    void Run(const std::string &server_address);
+    void Start(const std::string &server_address);
+    void Stop();
 
   private:
-
-    void Handle_();
-
-    std::unique_ptr<grpc::ServerCompletionQueue> cq_;
-    BatchingServable::AsyncService service_;
+    std::thread serve_thread_;
     std::unique_ptr<grpc::Server> server_;
 
     Servable *servable_;

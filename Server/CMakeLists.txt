@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(BatchingRPCServer C CXX)
 
+set(CMAKE_CXX_STANDARD 11)
+
 set(CMAKE_FIND_FRAMEWORK LAST)
 
 find_package(protobuf 3.5 REQUIRED)

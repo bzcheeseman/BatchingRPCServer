@@ -54,7 +54,7 @@ namespace {
     message.set_k(result_shape[1]);
     message.set_nr(result_shape[2]);
     message.set_nc(result_shape[3]);
-    message.set_name("data");
+    message.set_client_id("data");
 
     return message;
   }

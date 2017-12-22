@@ -46,7 +46,7 @@ namespace Serving {
 
     ~MXNetServable();
 
-    ReturnCodes AddToBatch(TensorMessage &message, std::string client_id) override;
+    ReturnCodes AddToBatch(const TensorMessage &message, std::string client_id) override;
 
     TensorMessage GetResult(std::string client_id) override;
 

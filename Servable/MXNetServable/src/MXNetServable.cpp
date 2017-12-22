@@ -42,7 +42,7 @@ namespace Serving {
     if (bind_called_) delete executor_;
   }
 
-  ReturnCodes MXNetServable::AddToBatch(TensorMessage &message, std::string client_id) {
+  ReturnCodes MXNetServable::AddToBatch(const TensorMessage &message, std::string client_id) {
 
     if (!bind_called_) {
       return ReturnCodes::NEED_BIND_CALL;
@@ -98,7 +98,7 @@ namespace Serving {
     message.set_k(result_shape[1]);
     message.set_nr(result_shape[2]);
     message.set_nc(result_shape[3]);
-    message.set_name(client_id + "_result");
+    message.set_client_id(client_id);
 
     return message;
   }

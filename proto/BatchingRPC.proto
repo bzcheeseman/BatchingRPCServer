@@ -30,13 +30,7 @@ message TensorMessage {
     string client_id = 6;
 }
 
-message ClientID {
-    string id = 1;
-}
-
-message ConnectionRequest {
-    bool b = 1;
-}
+message ConnectionRequest {}
 
 message ConnectionReply {
     string client_id = 1;
@@ -45,7 +39,7 @@ message ConnectionReply {
 /*
     The protocol is:
      - Send Connect call
-     - Receive your uuid back. Add this to the metadata of every message you send thereafter.
+     - Then send Process calls
 */
 service BatchingServable {
     rpc Connect(ConnectionRequest) returns (ConnectionReply) {}

@@ -46,7 +46,7 @@ namespace Serving {
 
     ~MXNetServable();
 
-    ReturnCodes AddToBatch(const TensorMessage &message, std::string client_id) override;
+    ReturnCodes AddToBatch(const TensorMessage &message) override;
 
     TensorMessage GetResult(std::string client_id) override;
 
@@ -55,7 +55,7 @@ namespace Serving {
 
   private:
 
-    void UpdateClientIDX(std::string &client_id, mx_uint &&msg_n);
+    void UpdateClientIDX(const std::string &client_id, mx_uint &&msg_n);
     void LoadParameters_(std::map<std::string, mx::NDArray> &parameters);
     void ProcessCurrentBatch_();
 

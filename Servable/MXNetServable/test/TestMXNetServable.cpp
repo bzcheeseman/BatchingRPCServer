@@ -102,7 +102,7 @@ namespace {
     EXPECT_NO_THROW(servable.Bind(fc, parms));
   }
 
-  TEST_F(TestMXNetServable, BindFile) { // BN loading fails for some reason
+  TEST_F(TestMXNetServable, BindFile) {
     Serving::MXNetServable servable (mx::Shape(16, 3, 256, 256), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
     EXPECT_NO_THROW(servable.Bind(
@@ -117,8 +117,9 @@ namespace {
     servable.Bind(fc, parms);
 
     Serving::TensorMessage msg = ToMessage(input);
+    msg.set_client_id("test");
 
-    Serving::ReturnCodes r = servable.AddToBatch(msg, "test");
+    Serving::ReturnCodes r = servable.AddToBatch(msg);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
 
     Serving::TensorMessage output = servable.GetResult("test");
@@ -136,10 +137,11 @@ namespace {
     servable.Bind(fc, parms);
 
     Serving::TensorMessage msg = ToMessage(input);
+    msg.set_client_id("test");
 
-    Serving::ReturnCodes r1 = servable.AddToBatch(msg, "test");
+    Serving::ReturnCodes r1 = servable.AddToBatch(msg);
     EXPECT_EQ(r1, Serving::ReturnCodes::OK);
-    Serving::ReturnCodes r2 = servable.AddToBatch(msg, "test");
+    Serving::ReturnCodes r2 = servable.AddToBatch(msg);
     EXPECT_EQ(r2, Serving::ReturnCodes::OK);
 
 
@@ -160,13 +162,15 @@ namespace {
     servable.Bind(fc, parms);
 
     Serving::TensorMessage msg = ToMessage(input);
+    msg.set_client_id("test");
     Serving::TensorMessage z = ToMessage(zeros);
+    z.set_client_id("zeros");
 
-    Serving::ReturnCodes r1 = servable.AddToBatch(msg, "test");
+    Serving::ReturnCodes r1 = servable.AddToBatch(msg);
     EXPECT_EQ(r1, Serving::ReturnCodes::OK);
-    Serving::ReturnCodes r2 = servable.AddToBatch(msg, "test");
+    Serving::ReturnCodes r2 = servable.AddToBatch(msg);
     EXPECT_EQ(r2, Serving::ReturnCodes::OK);
-    Serving::ReturnCodes r3 = servable.AddToBatch(z, "zeros");
+    Serving::ReturnCodes r3 = servable.AddToBatch(z);
     EXPECT_EQ(r3, Serving::ReturnCodes::OK);
 
     Serving::TensorMessage output;

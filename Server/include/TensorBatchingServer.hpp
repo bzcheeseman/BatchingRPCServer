@@ -43,10 +43,12 @@ namespace Serving {
     grpc::Status Connect(grpc::ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) override ;
     grpc::Status Process(grpc::ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) override ;
 
-    void Start(const std::string &server_address);
+    void StartInsecure(const std::string &server_address);
+//    void StartSSL(const std::string &server_address);
     void Stop();
 
   private:
+    std::set<std::string> users_;
     std::thread serve_thread_;
     std::unique_ptr<grpc::Server> server_;
 

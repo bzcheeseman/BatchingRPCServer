@@ -38,7 +38,7 @@ namespace Serving {
   class Servable {
   public:
     virtual ~Servable() = 0;
-    virtual ReturnCodes AddToBatch(const TensorMessage &message, std::string client_id) = 0;
+    virtual ReturnCodes AddToBatch(const TensorMessage &message) = 0;
     virtual TensorMessage GetResult(std::string client_id) = 0;
   };
 

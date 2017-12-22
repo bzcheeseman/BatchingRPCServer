@@ -42,7 +42,7 @@ namespace Serving {
     if (bind_called_) delete executor_;
   }
 
-  ReturnCodes MXNetServable::AddToBatch(const TensorMessage &message, std::string client_id) {
+  ReturnCodes MXNetServable::AddToBatch(const TensorMessage &message) {
 
     if (!bind_called_) {
       return ReturnCodes::NEED_BIND_CALL;
@@ -67,7 +67,7 @@ namespace Serving {
     }
 
     for (int i = 0; i < message.n(); i++) {
-      UpdateClientIDX(client_id, current_n_+i);
+      UpdateClientIDX(message.client_id(), current_n_+i);
     }
 
     mx::NDArray message_array (message.buffer().data(),
@@ -130,7 +130,7 @@ namespace Serving {
 
   // Private methods //
 
-  void MXNetServable::UpdateClientIDX(std::string &client_id, mx_uint &&msg_n) {
+  void MXNetServable::UpdateClientIDX(const std::string &client_id, mx_uint &&msg_n) {
     idx_by_client_[client_id].push_back(msg_n);
   }
 

@@ -31,12 +31,12 @@
 namespace Serving {
   namespace {
 
-    class MockedServable : public Servable {
+    class EchoServable : public Servable {
     public:
-      MockedServable() = default;
-      ~MockedServable() override = default;
+      EchoServable() = default;
+      ~EchoServable() override = default;
 
-      ReturnCodes AddToBatch(const TensorMessage &message, std::string client_id) override {
+      ReturnCodes AddToBatch(const TensorMessage &message) override {
         msg = message;
         return OK;
       }
@@ -53,15 +53,18 @@ namespace Serving {
     protected:
       void SetUp() override {
 
-        servable = new MockedServable ();
+        servable = new EchoServable ();
         srv = new TBServer (servable);
-        srv->Start("localhost:50051");
+        srv->StartInsecure("localhost:50051");
 
-        lim = 10000;
+        lim = 100000;
         for (int i = 0; i < lim; i++) {
           msg.mutable_buffer()->Add((float)i);
         }
         msg.set_n(lim);
+        msg.set_k(0);
+        msg.set_nr(0);
+        msg.set_nc(0);
 
       }
 
@@ -90,30 +93,112 @@ namespace Serving {
 
       EXPECT_TRUE(status.ok());
       EXPECT_FALSE(rep.client_id().empty());
-
-      std::cout << "\nClient ID: " << rep.client_id() << std::endl;
     }
 
     TEST_F(TestTensorBatchingServer, Process) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 
-      grpc::ClientContext context;
-
       ConnectionReply rep;
+      grpc::Status status;
 
-      grpc::Status status = stub->Connect(&context, ConnectionRequest(), &rep);
-
-      EXPECT_TRUE(status.ok());
-      EXPECT_FALSE(rep.client_id().empty());
+      {
+        grpc::ClientContext context;
+        status = stub->Connect(&context, ConnectionRequest(), &rep);
+        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(rep.client_id().empty());
+      }
 
       msg.set_client_id(rep.client_id());
-      std::cout << msg.client_id() << std::endl;
 
       TensorMessage tensor_reply;
-      status = stub->Process(&context, msg, &tensor_reply);
 
-      EXPECT_TRUE(status.ok());
+      {
+        grpc::ClientContext context;
+        status = stub->Process(&context, msg, &tensor_reply);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(tensor_reply.n(), lim);
+      }
+
+      for (int i = 0; i < lim; i++) {
+        EXPECT_EQ(tensor_reply.buffer(i), (float)i);
+      }
+    }
+
+    TEST_F(TestTensorBatchingServer, FailProcess) {
+      std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
+      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+
+      msg.set_client_id("test");
+
+      TensorMessage tensor_reply;
+      grpc::Status status;
+
+      {
+        grpc::ClientContext context;
+        status = stub->Process(&context, msg, &tensor_reply);
+        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.error_code() == grpc::FAILED_PRECONDITION);
+      }
+    }
+
+    TEST_F(TestTensorBatchingServer, Reconnect) {
+      std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
+      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+
+      ConnectionReply rep;
+      grpc::Status status;
+
+      {
+        grpc::ClientContext context;
+        status = stub->Connect(&context, ConnectionRequest(), &rep);
+        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(rep.client_id().empty());
+      }
+
+      {
+        grpc::ClientContext context;
+        status = stub->Connect(&context, ConnectionRequest(), &rep);
+        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(rep.client_id().empty());
+      }
+    }
+
+    TEST_F(TestTensorBatchingServer, MultipleProcess) {
+      std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
+      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+
+      ConnectionReply rep;
+      grpc::Status status;
+
+      {
+        grpc::ClientContext context;
+        status = stub->Connect(&context, ConnectionRequest(), &rep);
+        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(rep.client_id().empty());
+      }
+
+      msg.set_client_id(rep.client_id());
+
+      TensorMessage tensor_reply;
+
+      {
+        grpc::ClientContext context;
+        status = stub->Process(&context, msg, &tensor_reply);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(tensor_reply.n(), lim);
+      }
+
+      for (int i = 0; i < lim; i++) {
+        EXPECT_EQ(tensor_reply.buffer(i), (float)i);
+      }
+
+      {
+        grpc::ClientContext context;
+        status = stub->Process(&context, msg, &tensor_reply);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(tensor_reply.n(), lim);
+      }
 
       for (int i = 0; i < lim; i++) {
         EXPECT_EQ(tensor_reply.buffer(i), (float)i);

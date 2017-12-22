@@ -48,6 +48,7 @@ namespace Serving {
     uuid_generate(uuid);
     char uuid_str[37];
     uuid_unparse_lower(uuid, uuid_str);
+    users_.emplace(uuid_str);
 
     rep->set_client_id(uuid_str);
 
@@ -55,7 +56,14 @@ namespace Serving {
   }
 
   grpc::Status TBServer::Process(grpc::ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) {
-    ReturnCodes code = servable_->AddToBatch(*req, req->client_id()); // Add to batch and move to the next stage
+
+    auto user = users_.find(req->client_id());
+    if (user == users_.end()) {
+      grpc::Status early_exit_status (grpc::FAILED_PRECONDITION, "Connect not called, client id unknown");
+      return early_exit_status;
+    }
+
+    ReturnCodes code = servable_->AddToBatch(*req); // Add to batch and move to the next stage
 
     switch (code) {
       case OK: break;
@@ -81,7 +89,7 @@ namespace Serving {
     return grpc::Status::OK;
   }
 
-  void TBServer::Start(const std::string &server_address) {
+  void TBServer::StartInsecure(const std::string &server_address) {
     ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(this);
@@ -92,7 +100,16 @@ namespace Serving {
 
   void TBServer::Stop() {
     server_->Shutdown();
-    if (serve_thread_.joinable()) serve_thread_.join();
+    serve_thread_.join();
   }
+
+//  void TBServer::StartSSL(const std::string &server_address) {
+//    ServerBuilder builder;
+//    builder.AddListeningPort(server_address, grpc::SslServerCredentials());
+//    builder.RegisterService(this);
+//    server_ = builder.BuildAndStart();
+//
+//    serve_thread_ = std::thread([&](){server_->Wait();});
+//  }
 
 }

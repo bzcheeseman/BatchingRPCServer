@@ -24,6 +24,7 @@
 #ifndef BATCHING_RPC_SERVER_SERVABLE_HPP
 #define BATCHING_RPC_SERVER_SERVABLE_HPP
 
+// Generated
 #include "BatchingRPC.pb.h"
 
 namespace Serving {

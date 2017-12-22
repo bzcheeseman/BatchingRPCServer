@@ -67,7 +67,7 @@ namespace Serving {
     }
 
     for (int i = 0; i < message.n(); i++) {
-      UpdateClientIDX(message.client_id(), current_n_+i);
+      UpdateClientIDX_(message.client_id(), current_n_ + i);
     }
 
     mx::NDArray message_array (message.buffer().data(),
@@ -130,7 +130,7 @@ namespace Serving {
 
   // Private methods //
 
-  void MXNetServable::UpdateClientIDX(const std::string &client_id, mx_uint &&msg_n) {
+  void MXNetServable::UpdateClientIDX_(const std::string &client_id, mx_uint &&msg_n) {
     idx_by_client_[client_id].push_back(msg_n);
   }
 
@@ -161,7 +161,7 @@ namespace Serving {
     for (auto &client_idx: idx_by_client_) {
       result_by_client_[client_idx.first] = mx::NDArray(mx::Shape(client_idx.second.size(), output_shape_[1]), ctx_);
       result_by_client_[client_idx.first] = 0.f;
-      for (int i = 0; i < client_idx.second.size(); i++) {
+      for (mx_uint i = 0; i < client_idx.second.size(); i++) {
         result_by_client_[client_idx.first].Slice(i, i+1) += result.Slice(client_idx.second[i], client_idx.second[i]+1);
       }
     }

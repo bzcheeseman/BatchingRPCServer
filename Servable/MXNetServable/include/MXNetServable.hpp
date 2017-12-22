@@ -24,12 +24,17 @@
 #ifndef BATCHING_RPC_SERVER_TENSORBATCHINGSERVABLE_HPP
 #define BATCHING_RPC_SERVER_TENSORBATCHINGSERVABLE_HPP
 
+// STL
 #include <map>
 
+// MXNet
 #include "mxnet-cpp/MxNetCpp.h"
 
-#include "BatchingRPC.pb.h"
+// Project
 #include "Servable.hpp"
+
+// Generated
+#include "BatchingRPC.pb.h"
 
 namespace Serving {
 
@@ -55,7 +60,7 @@ namespace Serving {
 
   private:
 
-    void UpdateClientIDX(const std::string &client_id, mx_uint &&msg_n);
+    void UpdateClientIDX_(const std::string &client_id, mx_uint &&msg_n);
     void LoadParameters_(std::map<std::string, mx::NDArray> &parameters);
     void ProcessCurrentBatch_();
 

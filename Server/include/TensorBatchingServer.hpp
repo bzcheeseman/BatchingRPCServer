@@ -24,13 +24,20 @@
 #ifndef BATCHING_RPC_SERVER_TENSORBATCHINGSERVER_HPP
 #define BATCHING_RPC_SERVER_TENSORBATCHINGSERVER_HPP
 
+// STL
+#include <thread>
+
+// UUID
 #include <uuid/uuid.h>
 
+// gRPC
 #include <grpc++/grpc++.h>
 #include <grpc/support/log.h>
-#include <thread>
+
+// Project
 #include "Servable.hpp"
 
+// Generated
 #include "BatchingRPC.pb.h"
 #include "BatchingRPC.grpc.pb.h"
 

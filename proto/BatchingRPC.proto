@@ -39,9 +39,11 @@ message ConnectionReply {
 /*
     The protocol is:
      - Send Connect call
-     - Then send Process calls
+     - Receive your uuid
+     - Send Process calls with the returned uuid as the message client_id
 */
 service BatchingServable {
     rpc Connect(ConnectionRequest) returns (ConnectionReply) {}
     rpc Process (TensorMessage) returns (TensorMessage) {}
+    // TODO: add admin endpoints for things like updating batch size, servable, etc.
 }

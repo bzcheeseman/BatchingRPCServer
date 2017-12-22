@@ -24,6 +24,7 @@
 #include "TensorBatchingServer.hpp"
 
 using grpc::Server;
+using grpc::ServerContext;
 using grpc::ServerAsyncResponseWriter;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
@@ -42,7 +43,7 @@ namespace Serving {
     ;
   }
 
-  grpc::Status TBServer::Connect(grpc::ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) {
+  Status TBServer::Connect(ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) {
 
     uuid_t uuid;
     uuid_generate(uuid);
@@ -52,10 +53,10 @@ namespace Serving {
 
     rep->set_client_id(uuid_str);
 
-    return grpc::Status::OK;
+    return Status::OK;
   }
 
-  grpc::Status TBServer::Process(grpc::ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) {
+  grpc::Status TBServer::Process(ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) {
 
     auto user = users_.find(req->client_id());
     if (user == users_.end()) {

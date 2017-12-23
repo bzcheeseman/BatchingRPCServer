@@ -13,7 +13,6 @@ file(GLOB proto_files ${CMAKE_SOURCE_DIR}/proto/*.proto)
 
 protobuf_generate_cpp(ProtoSources ProtoHeaders ${proto_files})
 grpc_generate_cpp(GrpcSources GrpcHeaders ${CMAKE_CURRENT_BINARY_DIR} ${proto_files})
-message(STATUS ${GrpcHeaders})
 
 file(GLOB batching_server_src src/*.cpp)
 file(GLOB batching_server_include include/*.hpp)
@@ -30,4 +29,4 @@ target_include_directories(TBServer
         ${CMAKE_CURRENT_SOURCE_DIR}/../Servable ${UUID_INCLUDE_DIRS}
 )
 
-add_gtest(TensorBatchingServer TBServer)
+add_gtest(TBServer TBServer)

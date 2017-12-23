@@ -21,7 +21,7 @@
  */
 
 
-#include "TensorBatchingServer.hpp"
+#include "TBServer.hpp"
 
 using grpc::Server;
 using grpc::ServerContext;

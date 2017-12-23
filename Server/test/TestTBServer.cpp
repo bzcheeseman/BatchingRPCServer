@@ -20,7 +20,7 @@
     limitations under the License.
  */
 
-#include "../include/TensorBatchingServer.hpp"
+#include "TBServer.hpp"
 #include "Servable.hpp"
 
 #include <grpc++/grpc++.h>
@@ -53,7 +53,7 @@ namespace Serving {
       TensorMessage msg;
     };
 
-    class TestTensorBatchingServer : public ::testing::Test {
+    class TestTBServer : public ::testing::Test {
     protected:
       void SetUp() override {
 
@@ -85,7 +85,7 @@ namespace Serving {
       TensorMessage msg;
     };
 
-    TEST_F(TestTensorBatchingServer, Connect) {
+    TEST_F(TestTBServer, Connect) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 
@@ -99,7 +99,7 @@ namespace Serving {
       EXPECT_FALSE(rep.client_id().empty());
     }
 
-    TEST_F(TestTensorBatchingServer, SetBatchSize) {
+    TEST_F(TestTBServer, SetBatchSize) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 
@@ -114,7 +114,7 @@ namespace Serving {
       EXPECT_TRUE(status.ok());
     }
 
-    TEST_F(TestTensorBatchingServer, Process) {
+    TEST_F(TestTBServer, Process) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 
@@ -144,7 +144,7 @@ namespace Serving {
       }
     }
 
-    TEST_F(TestTensorBatchingServer, FailProcess) {
+    TEST_F(TestTBServer, FailProcess) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 
@@ -161,7 +161,7 @@ namespace Serving {
       }
     }
 
-    TEST_F(TestTensorBatchingServer, Reconnect) {
+    TEST_F(TestTBServer, Reconnect) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 
@@ -183,7 +183,7 @@ namespace Serving {
       }
     }
 
-    TEST_F(TestTensorBatchingServer, MultipleProcess) {
+    TEST_F(TestTBServer, MultipleProcess) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 

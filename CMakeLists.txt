@@ -15,5 +15,25 @@ macro(add_gtest test_name lib)
     add_test(NAME Test${test_name} COMMAND Test${test_name})
 endmacro()
 
+function(add_integration)
+    if(NOT ARGN)
+        message(SEND_ERROR "Error: No Libraries to link to! called without any proto files")
+        return()
+    endif()
+    add_executable(TestIntegration ${CMAKE_CURRENT_SOURCE_DIR}/test/TestIntegration.cpp)
+    target_link_libraries(TestIntegration gtest_main)
+    foreach(LIB ${ARGN})
+        find_library(LIB
+                NAMES ${LIB}
+                HINTS ${CMAKE_BINARY_DIR}/Servable/* ${CMAKE_BINARY_DIR}/Server
+        )
+        target_link_libraries(TestIntegration ${LIB})
+    endforeach()
+
+    add_test(NAME TestIntegration COMMAND TestIntegration)
+endfunction()
+
 add_subdirectory(Server)
 add_subdirectory(Servable)
+
+add_integration(MXNetServable TBServer)

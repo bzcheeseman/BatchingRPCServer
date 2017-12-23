@@ -9,18 +9,23 @@ set(GTEST_CFG ${CMAKE_MODULE_PATH})
 set(GTEST_PREFIX ${CMAKE_CURRENT_BINARY_DIR})
 include(AddGTest)
 
-macro(add_gtest test_name lib)
-    add_executable(Test${test_name} ${CMAKE_CURRENT_SOURCE_DIR}/test/Test${test_name}.cpp)
+enable_testing()
+
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -V)
+
+function(add_gtest test_name lib)
+    add_executable(Test${test_name} EXCLUDE_FROM_ALL ${CMAKE_CURRENT_SOURCE_DIR}/test/Test${test_name}.cpp)
     target_link_libraries(Test${test_name} gtest_main ${lib})
-    add_test(NAME Test${test_name} COMMAND Test${test_name})
-endmacro()
+    add_test(NAME Test${test_name} COMMAND ${CMAKE_CURRENT_BINARY_DIR}/Test${test_name})
+    add_dependencies(check Test${test_name})
+endfunction()
 
 function(add_integration)
     if(NOT ARGN)
         message(SEND_ERROR "Error: No Libraries to link to! called without any proto files")
         return()
     endif()
-    add_executable(TestIntegration ${CMAKE_CURRENT_SOURCE_DIR}/test/TestIntegration.cpp)
+    add_executable(TestIntegration EXCLUDE_FROM_ALL ${CMAKE_CURRENT_SOURCE_DIR}/test/TestIntegration.cpp)
     target_link_libraries(TestIntegration gtest_main)
     foreach(LIB ${ARGN})
         find_library(LIB
@@ -36,4 +41,21 @@ endfunction()
 add_subdirectory(Server)
 add_subdirectory(Servable)
 
-add_integration(MXNetServable TBServer)  # add more libs here as more components get added
+find_package(protobuf 3.5 REQUIRED)
+find_package(GRPC 1.5 REQUIRED)
+
+# Generate my proto files
+file(GLOB proto_files ${CMAKE_SOURCE_DIR}/proto/*.proto)
+protobuf_generate_cpp(ProtoSources ProtoHeaders ${proto_files})
+grpc_generate_cpp(GrpcSources GrpcHeaders ${CMAKE_CURRENT_BINARY_DIR} ${proto_files})
+
+# Add the generated stuff and libs that everyone needs here
+set(SOURCES ${ProtoSources} ${ProtoHeaders} ${GrpcSources} ${GrpcHeaders} ${SOURCES})
+set(LIBS gRPC::grpc gRPC::grpc++ ${PROTOBUF_LIBRARIES} ${LIBS})
+set(INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRS})
+
+add_library(BatchingRPCServer SHARED ${SOURCES})
+target_link_libraries(BatchingRPCServer PUBLIC ${LIBS})
+target_include_directories(BatchingRPCServer PUBLIC ${INCLUDE_DIRS})
+
+add_integration(BatchingRPCServer)

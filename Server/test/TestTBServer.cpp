@@ -24,7 +24,6 @@
 #include "Servable.hpp"
 
 #include <grpc++/grpc++.h>
-#include <thread>
 
 #include "gtest/gtest.h"
 

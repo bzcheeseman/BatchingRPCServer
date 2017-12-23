@@ -5,8 +5,8 @@ project(BatchingRPCServer C CXX)
 find_package(MXNet REQUIRED)
 ######### MXNET #########
 
-file(GLOB servable_src src/*.cpp)
-file(GLOB servable_include include/*.hpp)
+file(GLOB servable_src ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+file(GLOB servable_include ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
 
 find_package(protobuf 3.5 REQUIRED)
 
@@ -19,10 +19,22 @@ add_library(MXNetServable SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/../Servable.hpp
         ${ProtoSources} ${ProtoHeaders}
 )
-target_link_libraries(MXNetServable PUBLIC ${MXNET_LIBS} PUBLIC ${PROTOBUF_LIBRARIES})
+target_link_libraries(MXNetServable
+        PUBLIC ${MXNET_LIBS}
+        PUBLIC ${PROTOBUF_LIBRARIES}
+)
 target_include_directories(MXNetServable
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${MXNET_INCLUDE_DIRS}
-               ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/..
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PUBLIC ${MXNET_INCLUDE_DIRS}
+        PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
 add_gtest(MXNetServable MXNetServable)
+
+# Add my source files to the upper level sources (not generated)
+set(SOURCES ${servable_src} ${servable_include} ${SOURCES} PARENT_SCOPE)
+# Add libs specific to me here
+set(LIBS ${MXNET_LIBS} ${LIBS} PARENT_SCOPE)
+# Add specific include directories here (not generated)
+set(INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include ${MXNET_INCLUDE_DIRS} ${INCLUDE_DIRS} PARENT_SCOPE)

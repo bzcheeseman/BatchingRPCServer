@@ -35,7 +35,8 @@ function(add_integration)
         target_link_libraries(TestIntegration ${LIB})
     endforeach()
 
-    add_test(NAME TestIntegration COMMAND TestIntegration)
+    add_test(NAME TestIntegration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/TestIntegration)
+    add_dependencies(check TestIntegration)
 endfunction()
 
 add_subdirectory(Server)

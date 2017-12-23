@@ -40,6 +40,16 @@ namespace Serving {
 
   namespace mx = mxnet::cpp;
 
+  struct RawBindArgs : public BindArgs {
+    mx::Symbol net;
+    std::map<std::string, mx::NDArray> parameters;
+  };
+
+  struct FileBindArgs : public BindArgs {
+    std::string symbol_filename;
+    std::string parameters_filename;
+  };
+
   class MXNetServable: public Servable {
   public:
     MXNetServable(
@@ -57,8 +67,7 @@ namespace Serving {
 
     TensorMessage GetResult(std::string client_id) override;
 
-    void Bind(mx::Symbol &net, std::map<std::string, mx::NDArray> &parameters);
-    void Bind(const std::string &symbol_filename, const std::string &parameters_filename);
+    ReturnCodes Bind(BindArgs &args) override ;
 
   private:
 

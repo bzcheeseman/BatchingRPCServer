@@ -34,19 +34,21 @@ namespace Serving {
     SHAPE_INCORRECT = 3,
     NEXT_BATCH = 4,
     BATCH_TOO_LARGE = 5,
+    NO_SUITABLE_BIND_ARGS = 6,
+  };
+
+  struct BindArgs {
+    virtual ~BindArgs() = default;
   };
 
   class Servable {
   public:
-    virtual ~Servable() = 0;
+    virtual ~Servable() = default;
     virtual ReturnCodes UpdateBatchSize(const int &new_size) = 0;
     virtual ReturnCodes AddToBatch(const TensorMessage &message) = 0;
     virtual TensorMessage GetResult(std::string client_id) = 0;
+    virtual ReturnCodes Bind(BindArgs &args) = 0;
   };
-
-  Servable::~Servable() {
-    ;
-  }
 } // Serving
 
 #endif //BATCHING_RPC_SERVER_SERVABLE_HPP

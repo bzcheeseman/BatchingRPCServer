@@ -44,7 +44,7 @@ namespace Serving {
 
   ReturnCodes MXNetServable::UpdateBatchSize(const int &new_size) {
     if (new_size <= current_n_) {
-      return NEXT_BATCH;
+      return ReturnCodes::NEXT_BATCH;
     }
 
     int old_n = input_shape_[0];
@@ -64,7 +64,7 @@ namespace Serving {
     args_map_["data"] = mx::NDArray(input_shape_, ctx_);
     BindExecutor_();
 
-    return OK;
+    return ReturnCodes::OK;
 
   }
 
@@ -128,19 +128,51 @@ namespace Serving {
     return message;
   }
 
-  void MXNetServable::Bind(mx::Symbol &net, std::map<std::string, mx::NDArray> &parameters) {
-    servable_ = net;
-    LoadParameters_(parameters);
-    BindExecutor_();
+  ReturnCodes MXNetServable::Bind(BindArgs &args) {
+    try {
+      RawBindArgs &raw_args = dynamic_cast<RawBindArgs &>(args);
+      servable_ = raw_args.net;
+      LoadParameters_(raw_args.parameters);
+      BindExecutor_();
+      return ReturnCodes::OK;
+    }
+    catch (std::bad_cast &e) {
+      ;
+    }
+
+    try {
+      FileBindArgs &file_args = dynamic_cast<FileBindArgs &>(args);
+      servable_ = mx::Symbol::Load(file_args.symbol_filename);
+      std::map<std::string, mx::NDArray> parameters = mx::NDArray::LoadToMap(file_args.parameters_filename);
+      LoadParameters_(parameters);
+      BindExecutor_();
+      return ReturnCodes::OK;
+    }
+    catch (std::bad_cast &e) {
+      ;
+    }
+
+    return ReturnCodes::NO_SUITABLE_BIND_ARGS;
+
   }
 
-  void MXNetServable::Bind(const std::string &symbol_filename, const std::string &parameters_filename) {
-    servable_ = mx::Symbol::Load(symbol_filename);
-
-    std::map<std::string, mx::NDArray> parameters = mx::NDArray::LoadToMap(parameters_filename);
-    LoadParameters_(parameters);
-    BindExecutor_();
-  }
+//  ReturnCodes MXNetServable::Bind(RawBindArgs &args) {
+//    servable_ = args.net;
+//    LoadParameters_(args.parameters);
+//    BindExecutor_();
+//
+//    return ReturnCodes::OK;
+//  }
+//
+//  ReturnCodes MXNetServable::Bind(FileBindArgs &args) {
+//    servable_ = mx::Symbol::Load(args.symbol_filename);
+//
+//    std::map<std::string, mx::NDArray> parameters = mx::NDArray::LoadToMap(args.parameters_filename);
+//    LoadParameters_(parameters);
+//    BindExecutor_();
+//
+//    return ReturnCodes::OK;
+//  }
 
   // Private methods //
 

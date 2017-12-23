@@ -87,6 +87,12 @@ namespace {
       too_big = mx::NDArray(mx::Shape(2, 1, 1, n_hidden), *ctx);
       too_big = 1.f;
 
+      raw_args.net = fc;
+      raw_args.parameters = parms;
+
+      file_args.symbol_filename = "../../../Servable/MXNetServable/test/assets/squeezenet_v1.1-symbol.json";
+      file_args.parameters_filename = "../../../Servable/MXNetServable/test/assets/squeezenet_v1.1-0000.params";
+
     }
 
     void TearDown() override {
@@ -102,27 +108,27 @@ namespace {
     mx::NDArray wrong_size;
     mx::NDArray too_big;
 
+    Serving::RawBindArgs raw_args;
+    Serving::FileBindArgs file_args;
+
   };
 
   TEST_F(TestMXNetServable, Bind) {
     Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    EXPECT_NO_THROW(servable.Bind(fc, parms));
+    EXPECT_NO_THROW(servable.Bind(raw_args));
   }
 
   TEST_F(TestMXNetServable, BindFile) {
     Serving::MXNetServable servable (mx::Shape(16, 3, 256, 256), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    EXPECT_NO_THROW(servable.Bind(
-            "../../../Servable/MXNetServable/test/assets/squeezenet_v1.1-symbol.json",
-            "../../../Servable/MXNetServable/test/assets/squeezenet_v1.1-0000.params"
-    ));
+    EXPECT_NO_THROW(servable.Bind(file_args));
   }
 
   TEST_F(TestMXNetServable, Single) {
     Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
+    servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(input);
     msg.set_client_id("test");
@@ -152,7 +158,7 @@ namespace {
   TEST_F(TestMXNetServable, BadShape) {
     Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
+    servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(wrong_size);
     msg.set_client_id("incorrect_shape");
@@ -164,7 +170,7 @@ namespace {
   TEST_F(TestMXNetServable, TooBig) {
     Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
+    servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(too_big);
     msg.set_client_id("too_big");
@@ -176,7 +182,7 @@ namespace {
   TEST_F(TestMXNetServable, NextBatch) {
     Serving::MXNetServable servable (mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
+    servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(too_big);
     msg.set_client_id("too_big");
@@ -193,7 +199,7 @@ namespace {
   TEST_F(TestMXNetServable, Multiple) {
     Serving::MXNetServable servable (mx::Shape(2, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
+    servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(input);
     msg.set_client_id("test");
@@ -218,7 +224,7 @@ namespace {
   TEST_F(TestMXNetServable, MultipleClients) {
     Serving::MXNetServable servable (mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
+    servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(input);
     msg.set_client_id("test");
@@ -254,7 +260,7 @@ namespace {
   TEST_F(TestMXNetServable, UpdateBatchSuccess) {
     Serving::MXNetServable servable (mx::Shape(2, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
+    servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(input);
     msg.set_client_id("test");
@@ -294,7 +300,7 @@ namespace {
   TEST_F(TestMXNetServable, UpdateBatchFail) {
     Serving::MXNetServable servable (mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(fc, parms);
+    servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(input);
     msg.set_client_id("test");

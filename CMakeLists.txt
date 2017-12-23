@@ -36,4 +36,4 @@ endfunction()
 add_subdirectory(Server)
 add_subdirectory(Servable)
 
-add_integration(MXNetServable TBServer)
+add_integration(MXNetServable TBServer)  # add more libs here as more components get added

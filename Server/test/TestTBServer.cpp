@@ -49,6 +49,10 @@ namespace Serving {
         return msg;
       }
 
+      ReturnCodes Bind(BindArgs &args) override {
+        return OK;
+      }
+
     private:
       TensorMessage msg;
     };

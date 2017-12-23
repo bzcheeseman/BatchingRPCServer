@@ -14,15 +14,15 @@ file(GLOB proto_files ${CMAKE_SOURCE_DIR}/proto/*.proto)
 
 protobuf_generate_cpp(ProtoSources ProtoHeaders ${proto_files})
 
-add_library(mx_servable SHARED
+add_library(MXNetServable SHARED
         ${servable_src} ${servable_include}
         ${CMAKE_CURRENT_SOURCE_DIR}/../Servable.hpp
         ${ProtoSources} ${ProtoHeaders}
 )
-target_link_libraries(mx_servable PUBLIC ${MXNET_LIBS} PUBLIC ${PROTOBUF_LIBRARIES})
-target_include_directories(mx_servable
+target_link_libraries(MXNetServable PUBLIC ${MXNET_LIBS} PUBLIC ${PROTOBUF_LIBRARIES})
+target_include_directories(MXNetServable
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${MXNET_INCLUDE_DIRS}
                ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
-add_gtest(MXNetServable mx_servable)
+add_gtest(MXNetServable MXNetServable)

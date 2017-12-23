@@ -49,6 +49,4 @@ namespace Serving {
   }
 } // Serving
 
-#include "MXNetServable/include/MXNetServable.hpp"
-
 #endif //BATCHING_RPC_SERVER_SERVABLE_HPP

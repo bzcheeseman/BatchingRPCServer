@@ -18,16 +18,16 @@ message(STATUS ${GrpcHeaders})
 file(GLOB batching_server_src src/*.cpp)
 file(GLOB batching_server_include include/*.hpp)
 
-add_library(batching_server SHARED
+add_library(TBServer SHARED
         ${batching_server_src} ${batching_server_include}
         ${ProtoSources} ${ProtoHeaders}
         ${GrpcSources} ${GrpcHeaders}
 )
-target_link_libraries(batching_server gRPC::grpc gRPC::grpc++ ${PROTOBUF_LIBRARIES})
-target_include_directories(batching_server
+target_link_libraries(TBServer gRPC::grpc gRPC::grpc++ ${PROTOBUF_LIBRARIES})
+target_include_directories(TBServer
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_BINARY_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/../Servable ${UUID_INCLUDE_DIRS}
 )
 
-add_gtest(TensorBatchingServer batching_server)
+add_gtest(TensorBatchingServer TBServer)

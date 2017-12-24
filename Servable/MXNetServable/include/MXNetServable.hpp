@@ -26,6 +26,7 @@
 
 // STL
 #include <map>
+#include <thread>
 
 // MXNet
 #include "mxnet-cpp/MxNetCpp.h"
@@ -63,7 +64,7 @@ namespace Serving {
 
     ReturnCodes UpdateBatchSize(const int &new_size) override ;
 
-    ReturnCodes AddToBatch(const TensorMessage &message) override;
+    ReturnCodes AddToBatch(const TensorMessage &message) override ;
 
     TensorMessage GetResult(std::string client_id) override;
 
@@ -74,17 +75,26 @@ namespace Serving {
     void BindExecutor_();
     void UpdateClientIDX_(const std::string &client_id, mx_uint &&msg_n);
     void LoadParameters_(std::map<std::string, mx::NDArray> &parameters);
+    void MergeInputs_();
     void ProcessCurrentBatch_();
 
     // Basic I/O requirements
-    bool bind_called_;
+    std::atomic<bool> bind_called_;
     mx::Shape input_shape_;
     mx::Shape output_shape_;
 
     // Information for processing
+    std::mutex input_mutex_;
     std::map<std::string, std::vector<mx_uint>> idx_by_client_;
-    mx_uint current_n_;
+    std::map<std::string, std::vector<mx::NDArray>> input_by_client_;
+
+    std::atomic<mx_uint> current_n_;
+
+    std::mutex batch_mutex_;
     mx::NDArray current_batch_;
+
+    std::mutex result_mutex_;
+    std::condition_variable result_cv_;
     std::map<std::string, mx::NDArray> result_by_client_;
 
     // MXNet requirements for running
@@ -95,7 +105,7 @@ namespace Serving {
     std::map<std::string, mx::NDArray> aux_map_; // everyone else is aux
 
     // Serving vars
-    bool ready_to_process_ = false;
+    std::atomic<bool> ready_to_process_;
   };
 
 } // Serving

@@ -30,9 +30,9 @@ namespace Serving {
           const mx::Shape &output_shape,
           const mx::DeviceType &type,
           const int &device_id
-  ) : input_shape_(input_shape), output_shape_(output_shape), ctx_(type, device_id), bind_called_(false) {
+  ) : input_shape_(input_shape), output_shape_(output_shape), ctx_(type, device_id),
+      bind_called_(false), ready_to_process_(false), current_n_(0) {
 
-    current_n_ = 0;
     current_batch_ = mx::NDArray(input_shape_, ctx_);
     args_map_["data"] = mx::NDArray(input_shape_, ctx_);
 
@@ -43,6 +43,8 @@ namespace Serving {
   }
 
   ReturnCodes MXNetServable::UpdateBatchSize(const int &new_size) {
+    std::lock_guard<std::mutex> guard (batch_mutex_);
+
     if (new_size <= current_n_) {
       return ReturnCodes::NEXT_BATCH;
     }
@@ -70,6 +72,8 @@ namespace Serving {
 
   ReturnCodes MXNetServable::AddToBatch(const TensorMessage &message) {
 
+    std::string client_id = message.client_id();
+
     if (!bind_called_) {
       return ReturnCodes::NEED_BIND_CALL;
     }
@@ -82,28 +86,28 @@ namespace Serving {
       return ReturnCodes::SHAPE_INCORRECT;
     }
 
-    if (message.n() + current_n_ > input_shape_[0]) { // early exit if we've got almost enough stuff here
-      ProcessCurrentBatch_();
+    if (message.n() + current_n_.load() > input_shape_[0]) {
+      ready_to_process_ = true;
       return ReturnCodes::NEXT_BATCH;
     }
 
-    if (message.n() + current_n_ == input_shape_[0]) { // we will be ready once this batch goes in
-      ready_to_process_ = true;
+    {
+      std::lock_guard<std::mutex> guard_input(input_mutex_);
+
+      for (int i = 0; i < message.n(); i++) {
+        UpdateClientIDX_(client_id, current_n_.load() + i);
+      }
+
+      input_by_client_[client_id].emplace_back(
+              mx::NDArray(message.buffer().data(),
+                          mx::Shape(message.n(), input_shape_[1], input_shape_[2], input_shape_[3]),
+                          ctx_)
+      );
     }
 
-    for (int i = 0; i < message.n(); i++) {
-      UpdateClientIDX_(message.client_id(), current_n_ + i);
-    }
+    current_n_.fetch_add(message.n());
 
-    mx::NDArray message_array (message.buffer().data(),
-                               mx::Shape(message.n(), input_shape_[1], input_shape_[2], input_shape_[3]),
-                               ctx_);
-
-    current_batch_.Slice(current_n_, current_n_+message.n()) = 0.f;
-    current_batch_.Slice(current_n_, current_n_+message.n()) += message_array;
-    current_n_ += message.n();
-
-    if (ready_to_process_) {
+    if (current_n_.load() == input_shape_[0] || ready_to_process_) {
       ProcessCurrentBatch_();
     }
 
@@ -112,11 +116,12 @@ namespace Serving {
 
   TensorMessage MXNetServable::GetResult(std::string client_id) {
 
-    mx::NDArray client_result = result_by_client_[client_id];
-    std::vector<mx_uint> result_shape = client_result.GetShape();
-
     TensorMessage message;
-    google::protobuf::RepeatedField<float> data(client_result.GetData(), client_result.GetData()+client_result.Size());
+    mx::NDArray &result_array = result_by_client_.at(client_id);
+
+    std::vector<mx_uint> result_shape = result_array.GetShape();
+
+    google::protobuf::RepeatedField<float> data(result_array.GetData(), result_array.GetData()+result_array.Size());
     message.mutable_buffer()->Swap(&data);
 
     message.set_n(result_shape[0]);
@@ -126,6 +131,7 @@ namespace Serving {
     message.set_client_id(client_id);
 
     return message;
+
   }
 
   ReturnCodes MXNetServable::Bind(BindArgs &args) {
@@ -155,24 +161,6 @@ namespace Serving {
     return ReturnCodes::NO_SUITABLE_BIND_ARGS;
 
   }
-
-//  ReturnCodes MXNetServable::Bind(RawBindArgs &args) {
-//    servable_ = args.net;
-//    LoadParameters_(args.parameters);
-//    BindExecutor_();
-//
-//    return ReturnCodes::OK;
-//  }
-//
-//  ReturnCodes MXNetServable::Bind(FileBindArgs &args) {
-//    servable_ = mx::Symbol::Load(args.symbol_filename);
-//
-//    std::map<std::string, mx::NDArray> parameters = mx::NDArray::LoadToMap(args.parameters_filename);
-//    LoadParameters_(parameters);
-//    BindExecutor_();
-//
-//    return ReturnCodes::OK;
-//  }
 
   // Private methods //
 
@@ -205,6 +193,10 @@ namespace Serving {
 
   void MXNetServable::ProcessCurrentBatch_() {
 
+    std::lock_guard<std::mutex> guard_processing(batch_mutex_);
+
+    this->MergeInputs_();
+
     current_batch_.CopyTo(&args_map_["data"]);
 
     executor_->Forward(false);
@@ -224,6 +216,22 @@ namespace Serving {
     current_batch_ = 0.f;
     ready_to_process_ = false;
 
+  }
+
+  void MXNetServable::MergeInputs_() {
+
+    std::lock_guard<std::mutex> guard_input(input_mutex_);
+
+    size_t num_client_inputs = 0;
+    for (auto &in : input_by_client_) {
+      std::vector<mx_uint> &idx = idx_by_client_.at(in.first);
+      num_client_inputs = idx.size();
+      for (size_t i = 0; i < num_client_inputs; i++) {
+        current_batch_.Slice(idx[i], idx[i]+1) = 0.f;
+        current_batch_.Slice(idx[i], idx[i]+1) += in.second[i];
+      }
+    }
+    input_by_client_.clear();
   }
 
 } // Serving

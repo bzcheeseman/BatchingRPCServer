@@ -59,6 +59,11 @@ namespace {
     return message;
   }
 
+  void ThreadedAdd(Serving::Servable *servable, Serving::TensorMessage msg) {
+    Serving::ReturnCodes r1 = servable->AddToBatch(msg);
+    EXPECT_EQ(r1, Serving::ReturnCodes::OK);
+  }
+
   class TestMXNetServable : public ::testing::Test {
 
   protected:
@@ -100,7 +105,7 @@ namespace {
     }
 
     mx::Context *ctx;
-    int n_hidden = 600;
+    int n_hidden = 2000;
     mx::Symbol fc;
     std::map<std::string, mx::NDArray> parms;
     mx::NDArray input;
@@ -204,12 +209,11 @@ namespace {
     Serving::TensorMessage msg = ToMessage(input);
     msg.set_client_id("test");
 
-    Serving::ReturnCodes r1 = servable.AddToBatch(msg);
-    EXPECT_EQ(r1, Serving::ReturnCodes::OK);
-    Serving::ReturnCodes r2 = servable.AddToBatch(msg);
-    EXPECT_EQ(r2, Serving::ReturnCodes::OK);
+    std::thread t1 (ThreadedAdd, &servable, msg);
+    std::thread t2 (ThreadedAdd, &servable, msg);
 
-
+    t1.join();
+    t2.join();
     Serving::TensorMessage output = servable.GetResult("test");
 
     EXPECT_EQ(output.n(), 2);
@@ -231,23 +235,24 @@ namespace {
     Serving::TensorMessage z = ToMessage(zeros);
     z.set_client_id("zeros");
 
-    Serving::ReturnCodes r1 = servable.AddToBatch(msg);
-    EXPECT_EQ(r1, Serving::ReturnCodes::OK);
-    Serving::ReturnCodes r2 = servable.AddToBatch(msg);
-    EXPECT_EQ(r2, Serving::ReturnCodes::OK);
-    Serving::ReturnCodes r3 = servable.AddToBatch(z);
-    EXPECT_EQ(r3, Serving::ReturnCodes::OK);
+    std::thread t1 (ThreadedAdd, &servable, msg);
+    std::thread t2 (ThreadedAdd, &servable, msg);
+    std::thread tz (ThreadedAdd, &servable, z);
 
     Serving::TensorMessage output;
     int buflen;
 
+    tz.join();
     output = servable.GetResult("zeros");
     EXPECT_EQ(output.n(), 1);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
       EXPECT_EQ(output.buffer(i), 1.f);
     }
+    output.clear_buffer();
 
+    t1.join();
+    t2.join();
     output = servable.GetResult("test");
     EXPECT_EQ(output.n(), 2);
     buflen = msg.buffer().size();
@@ -267,27 +272,29 @@ namespace {
     Serving::TensorMessage z = ToMessage(zeros);
     z.set_client_id("zeros");
 
-    Serving::ReturnCodes r1 = servable.AddToBatch(msg);
-    EXPECT_EQ(r1, Serving::ReturnCodes::OK);
+    std::thread t1 (ThreadedAdd, &servable, msg);
 
     Serving::ReturnCodes r2 = servable.UpdateBatchSize(3);
     EXPECT_EQ(r2, Serving::ReturnCodes::OK);
 
-    Serving::ReturnCodes r3 = servable.AddToBatch(msg);
-    EXPECT_EQ(r3, Serving::ReturnCodes::OK);
-    Serving::ReturnCodes r4 = servable.AddToBatch(z);
-    EXPECT_EQ(r4, Serving::ReturnCodes::OK);
+
+    std::thread t2 (ThreadedAdd, &servable, msg);
+    std::thread tz (ThreadedAdd, &servable, z);
 
     Serving::TensorMessage output;
     int buflen;
 
+    tz.join();
     output = servable.GetResult("zeros");
     EXPECT_EQ(output.n(), 1);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
       EXPECT_EQ(output.buffer(i), 1.f);
     }
+    output.clear_buffer();
 
+    t1.join();
+    t2.join();
     output = servable.GetResult("test");
     EXPECT_EQ(output.n(), 2);
     buflen = msg.buffer().size();
@@ -307,27 +314,28 @@ namespace {
     Serving::TensorMessage z = ToMessage(zeros);
     z.set_client_id("zeros");
 
-    Serving::ReturnCodes r1 = servable.AddToBatch(msg);
-    EXPECT_EQ(r1, Serving::ReturnCodes::OK);
-    Serving::ReturnCodes r2 = servable.AddToBatch(msg);
-    EXPECT_EQ(r2, Serving::ReturnCodes::OK);
+    std::thread t1 (ThreadedAdd, &servable, msg);
+    std::thread t2 (ThreadedAdd, &servable, msg);
 
     Serving::ReturnCodes r3 = servable.UpdateBatchSize(1);
     EXPECT_EQ(r3, Serving::ReturnCodes::NEXT_BATCH);
 
-    Serving::ReturnCodes r4 = servable.AddToBatch(z);
-    EXPECT_EQ(r4, Serving::ReturnCodes::OK);
+    std::thread tz (ThreadedAdd, &servable, z);
 
     Serving::TensorMessage output;
     int buflen;
 
+    tz.join();
     output = servable.GetResult("zeros");
     EXPECT_EQ(output.n(), 1);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
       EXPECT_EQ(output.buffer(i), 1.f);
     }
+    output.clear_buffer();
 
+    t1.join();
+    t2.join();
     output = servable.GetResult("test");
     EXPECT_EQ(output.n(), 2);
     buflen = msg.buffer().size();

@@ -30,6 +30,8 @@
 #include "BatchingRPC.pb.h"
 #include "BatchingRPC.grpc.pb.h"
 
+#include <future>
+
 namespace Serving {
   namespace {
 
@@ -45,10 +47,10 @@ namespace Serving {
       return result;
     }
 
-    Serving::TensorMessage ToMessage(mx::NDArray &arr) {
+    TensorMessage ToMessage(mx::NDArray &arr) {
       std::vector<mx_uint> result_shape = arr.GetShape();
 
-      Serving::TensorMessage message;
+      TensorMessage message;
       google::protobuf::RepeatedField<float> data(arr.GetData(), arr.GetData() + arr.Size());
       message.mutable_buffer()->Swap(&data);
 
@@ -59,6 +61,25 @@ namespace Serving {
       message.set_client_id("data");
 
       return message;
+    }
+
+    void ThreadProcess(std::unique_ptr<BatchingServable::Stub> &stub, TensorMessage msg, TensorMessage &reply) {
+      grpc::Status status;
+      ConnectionReply rep;
+
+      {
+        grpc::ClientContext context;
+        stub->Connect(&context, ConnectionRequest(), &rep);
+      }
+
+      msg.set_client_id(rep.client_id());
+
+
+      {
+        grpc::ClientContext context;
+        stub->Process(&context, msg, &reply);
+      }
+
     }
 
     class TestIntegration : public ::testing::Test {
@@ -79,9 +100,9 @@ namespace Serving {
         input = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
         input = 1.f;
 
-        servable = new MXNetServable(mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+        MXNetServable *servable = new MXNetServable(mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
         servable->Bind(raw_args);
-        srv = new TBServer(servable);
+        srv = new TBServer(servable); // takes control of the servable
         srv->StartInsecure("localhost:50051");
 
         msg = ToMessage(input);
@@ -91,10 +112,8 @@ namespace Serving {
       void TearDown() override {
         srv->Stop();
         delete srv;
-        delete servable;
       }
 
-      Serving::Servable *servable;
       Serving::TBServer *srv;
 
       Serving::TensorMessage msg;
@@ -166,8 +185,61 @@ namespace Serving {
           EXPECT_EQ(tensor_reply.buffer(i), 2.f * n_hidden + 1);
         }
       }
+    }
 
-      //
+    TEST_F(TestIntegration, ThreadedProcessSingle) {
+      std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
+                                                                   grpc::InsecureChannelCredentials());
+      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+
+      TensorMessage tensor_reply;
+
+      std::thread processing_thread (ThreadProcess, std::ref(stub), msg, std::ref(tensor_reply));
+
+      processing_thread.join();
+      int buflen = tensor_reply.buffer().size();
+      for (int i = 0; i < buflen; i++) {
+        EXPECT_EQ(tensor_reply.buffer(i), 2.f * n_hidden + 1);
+      }
+    }
+
+    TEST_F(TestIntegration, ThreadedProcessMultiple) {
+      std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
+                                                                   grpc::InsecureChannelCredentials());
+      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+
+      int batch_size = 2;
+
+      {
+        grpc::ClientContext context;
+        AdminRequest req;
+        req.set_new_batch_size(batch_size);
+        AdminReply rep;
+
+        grpc::Status status = stub->SetBatchSize(&context, req, &rep);
+        EXPECT_TRUE(status.ok());
+      }
+
+      std::vector<std::thread> request_threads;
+      std::vector<TensorMessage> results (batch_size);
+
+      for (int i = 0; i < batch_size; i++) {
+        request_threads.emplace_back(std::thread(ThreadProcess, std::ref(stub), msg, std::ref(results[i])));
+      }
+
+      int buflen;
+      for (int i = 0; i < batch_size; i++) {
+        std::cout << i << std::endl;
+        request_threads[i].join();
+        TensorMessage &tensor_reply = results[i];
+
+        buflen = tensor_reply.buffer().size();
+        for (int j = 0; j < buflen; j++) {
+          EXPECT_EQ(tensor_reply.buffer(j), 2.f * n_hidden + 1);
+        }
+        tensor_reply.clear_buffer();
+        buflen = 0;
+      }
     }
   }
 } // Serving

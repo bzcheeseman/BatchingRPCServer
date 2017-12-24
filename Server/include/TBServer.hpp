@@ -60,7 +60,7 @@ namespace Serving {
     std::thread serve_thread_;
     std::unique_ptr<grpc::Server> server_;
 
-    Servable *servable_;
+    std::unique_ptr<Servable> servable_;
   };
 }
 

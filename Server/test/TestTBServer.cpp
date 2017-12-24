@@ -60,7 +60,7 @@ namespace Serving {
     protected:
       void SetUp() override {
 
-        servable = new EchoServable ();
+        EchoServable *servable = new EchoServable ();
         srv = new TBServer (servable);
         srv->StartInsecure("localhost:50051");
 
@@ -78,11 +78,9 @@ namespace Serving {
       void TearDown() override {
         srv->Stop();
         delete srv;
-        delete servable;
       }
 
       int lim;
-      Serving::Servable *servable;
       Serving::TBServer *srv;
 
       TensorMessage msg;

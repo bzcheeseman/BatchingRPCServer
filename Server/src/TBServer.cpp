@@ -78,6 +78,7 @@ namespace Serving {
       return early_exit_status;
     }
 
+    // TODO: make sure that this is all going to the same servable - only one instance!
     ReturnCodes code = servable_->AddToBatch(*req); // Add to batch and move to the next stage
 
     switch (code) {

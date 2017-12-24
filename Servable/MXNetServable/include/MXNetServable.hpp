@@ -86,6 +86,7 @@ namespace Serving {
     // Information for processing
     std::mutex input_mutex_;
     std::map<std::string, std::vector<mx_uint>> idx_by_client_;
+    std::set<std::string> current_batch_clients_;
     std::map<std::string, std::vector<mx::NDArray>> input_by_client_;
 
     std::atomic<mx_uint> current_n_;
@@ -95,7 +96,7 @@ namespace Serving {
 
     std::mutex result_mutex_;
     std::condition_variable result_cv_;
-    std::atomic<bool> done_processing_;
+    std::map<std::string, bool> done_processing_by_client_;
     std::map<std::string, mx::NDArray> result_by_client_;
 
     // MXNet requirements for running

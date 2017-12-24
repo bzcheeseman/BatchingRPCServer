@@ -203,7 +203,7 @@ namespace Serving {
       }
     }
 
-    TEST_F(TestIntegration, ThreadedProcessMultiple) {
+    TEST_F(TestIntegration, ThreadedProcessMultiple_SingleBatch) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
@@ -214,6 +214,44 @@ namespace Serving {
         grpc::ClientContext context;
         AdminRequest req;
         req.set_new_batch_size(batch_size);
+        AdminReply rep;
+
+        grpc::Status status = stub->SetBatchSize(&context, req, &rep);
+        EXPECT_TRUE(status.ok());
+      }
+
+      std::vector<std::thread> request_threads;
+      std::vector<TensorMessage> results (batch_size);
+
+      for (int i = 0; i < batch_size; i++) {
+        request_threads.emplace_back(std::thread(ThreadProcess, std::ref(stub), msg, std::ref(results[i])));
+      }
+
+      int buflen;
+      for (int i = 0; i < batch_size; i++) {
+        request_threads[i].join();
+        TensorMessage &tensor_reply = results[i];
+
+        buflen = tensor_reply.buffer().size();
+        for (int j = 0; j < buflen; j++) {
+          EXPECT_EQ(tensor_reply.buffer(j), 2.f * n_hidden + 1);
+        }
+        tensor_reply.clear_buffer();
+        buflen = 0;
+      }
+    }
+
+    TEST_F(TestIntegration, ThreadedProcessMultiple_MultiBatch) {
+      std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
+                                                                   grpc::InsecureChannelCredentials());
+      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+
+      int batch_size = 20;
+
+      {
+        grpc::ClientContext context;
+        AdminRequest req;
+        req.set_new_batch_size(5);
         AdminReply rep;
 
         grpc::Status status = stub->SetBatchSize(&context, req, &rep);

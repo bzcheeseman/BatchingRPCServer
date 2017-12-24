@@ -106,6 +106,10 @@ namespace Serving {
 
     switch (code) {
       case OK: break;
+      case NEXT_BATCH: {
+        grpc::Status early_exit_status (grpc::UNAVAILABLE, "Try again later, processing hasn't yet started!");
+        return early_exit_status;
+      }
     }
 
     return grpc::Status::OK;

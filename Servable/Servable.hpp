@@ -35,6 +35,7 @@ namespace Serving {
     NEXT_BATCH = 4,
     BATCH_TOO_LARGE = 5,
     NO_SUITABLE_BIND_ARGS = 6,
+    NOT_FOUND = 7,
   };
 
   struct BindArgs {

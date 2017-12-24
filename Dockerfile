@@ -3,6 +3,7 @@ FROM nvidia/cuda:9.0-cudnn7-devel
 RUN apt-get update -y \
  && apt-get install -y --no-install-recommends \
  git \
+ wget \
  build-essential \
  libopencv-dev \
  libopenblas-dev \

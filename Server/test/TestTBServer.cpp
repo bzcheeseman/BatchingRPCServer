@@ -46,6 +46,7 @@ namespace Serving {
 
       ReturnCodes GetResult(const std::string &client_id, TensorMessage *message) override {
         *message = msg;
+        return OK;
       }
 
       ReturnCodes Bind(BindArgs &args) override {

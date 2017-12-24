@@ -1,4 +1,4 @@
-FROM batchingrpcserver-env:latest
+FROM bzcheeseman/batchingrpcserver-env:latest
 
 WORKDIR /BatchingRPCServer
 

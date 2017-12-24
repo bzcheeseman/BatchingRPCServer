@@ -72,7 +72,7 @@ namespace Serving {
 
   ReturnCodes MXNetServable::AddToBatch(const TensorMessage &message) {
 
-    std::string client_id = message.client_id();
+    const std::string &client_id = message.client_id();
 
     if (!bind_called_) {
       return ReturnCodes::NEED_BIND_CALL;

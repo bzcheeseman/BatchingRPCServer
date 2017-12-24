@@ -138,4 +138,7 @@ Mkfile.old
 dkms.conf
 
 buildenv/
+.travis.yml
+LICENSE.txt
+README.md
 

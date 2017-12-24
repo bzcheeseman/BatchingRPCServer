@@ -66,7 +66,7 @@ namespace Serving {
 
     ReturnCodes AddToBatch(const TensorMessage &message) override ;
 
-    TensorMessage GetResult(std::string client_id) override;
+    ReturnCodes GetResult(const std::string &client_id, TensorMessage *message) override ;
 
     ReturnCodes Bind(BindArgs &args) override ;
 

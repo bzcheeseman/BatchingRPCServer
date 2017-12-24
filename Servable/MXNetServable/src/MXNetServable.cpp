@@ -114,26 +114,25 @@ namespace Serving {
     return ReturnCodes::OK;
   }
 
-  TensorMessage MXNetServable::GetResult(std::string client_id) {
+  ReturnCodes MXNetServable::GetResult(const std::string &client_id, TensorMessage *message) {
 
     std::unique_lock<std::mutex> lk(result_mutex_);
     result_cv_.wait(lk, [this](){return done_processing_.load();});
 
-    TensorMessage message;
     mx::NDArray &result_array = result_by_client_.at(client_id);
 
     std::vector<mx_uint> result_shape = result_array.GetShape();
 
     google::protobuf::RepeatedField<float> data(result_array.GetData(), result_array.GetData()+result_array.Size());
-    message.mutable_buffer()->Swap(&data);
+    message->mutable_buffer()->Swap(&data);
 
-    message.set_n(result_shape[0]);
-    message.set_k(result_shape[1]);
-    message.set_nr(result_shape[2]);
-    message.set_nc(result_shape[3]);
-    message.set_client_id(client_id);
+    message->set_n(result_shape[0]);
+    message->set_k(result_shape[1]);
+    message->set_nr(result_shape[2]);
+    message->set_nc(result_shape[3]);
+    message->set_client_id(client_id);
 
-    return message;
+    return ReturnCodes::OK;
 
   }
 

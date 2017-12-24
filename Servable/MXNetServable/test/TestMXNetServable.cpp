@@ -141,7 +141,9 @@ namespace {
     Serving::ReturnCodes r = servable.AddToBatch(msg);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
 
-    Serving::TensorMessage output = servable.GetResult("test");
+    Serving::TensorMessage output;
+    r = servable.GetResult("test", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
 
     int buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
@@ -214,7 +216,9 @@ namespace {
 
     t1.join();
     t2.join();
-    Serving::TensorMessage output = servable.GetResult("test");
+    Serving::TensorMessage output;
+    Serving::ReturnCodes r = servable.GetResult("test", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
 
     EXPECT_EQ(output.n(), 2);
 
@@ -241,10 +245,12 @@ namespace {
 
     Serving::TensorMessage output;
     int buflen;
+    Serving::ReturnCodes r;
 
     t1.join();
     t2.join();
-    output = servable.GetResult("test");
+    r = servable.GetResult("test", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 2);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
@@ -253,7 +259,8 @@ namespace {
     output.clear_buffer();
 
     tz.join();
-    output = servable.GetResult("zeros");
+    r = servable.GetResult("zeros", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 1);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
@@ -283,9 +290,11 @@ namespace {
 
     Serving::TensorMessage output;
     int buflen;
+    Serving::ReturnCodes r;
 
     tz.join();
-    output = servable.GetResult("zeros");
+    r = servable.GetResult("zeros", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 1);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
@@ -295,7 +304,8 @@ namespace {
 
     t1.join();
     t2.join();
-    output = servable.GetResult("test");
+    r = servable.GetResult("test", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 2);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
@@ -327,8 +337,10 @@ namespace {
 
     Serving::TensorMessage output;
     int buflen;
+    Serving::ReturnCodes r;
 
-    output = servable.GetResult("test");
+    r = servable.GetResult("test", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 2);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
@@ -337,7 +349,8 @@ namespace {
     output.clear_buffer();
 
     tz.join();
-    output = servable.GetResult("zeros");
+    r = servable.GetResult("zeros", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 1);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {

@@ -46,7 +46,7 @@ namespace Serving {
     virtual ~Servable() = default;
     virtual ReturnCodes UpdateBatchSize(const int &new_size) = 0;
     virtual ReturnCodes AddToBatch(const TensorMessage &message) = 0;
-    virtual TensorMessage GetResult(std::string client_id) = 0;
+    virtual ReturnCodes GetResult(const std::string &client_id, TensorMessage *message) = 0;
     virtual ReturnCodes Bind(BindArgs &args) = 0;
   };
 } // Serving

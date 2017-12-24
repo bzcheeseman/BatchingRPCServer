@@ -99,9 +99,15 @@ namespace Serving {
         grpc::Status early_exit_status (grpc::INVALID_ARGUMENT, "Batch request was too large, split into smaller pieces and retry");
         return early_exit_status;
       }
+      case NO_SUITABLE_BIND_ARGS: break; // this one won't be thrown by the function
     }
 
-    *rep = servable_->GetResult(req->client_id());
+    code = servable_->GetResult(req->client_id(), rep);
+
+    switch (code) {
+      case OK: break;
+    }
+
     return grpc::Status::OK;
   }
 

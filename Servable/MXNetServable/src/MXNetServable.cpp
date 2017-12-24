@@ -45,7 +45,7 @@ namespace Serving {
   ReturnCodes MXNetServable::UpdateBatchSize(const int &new_size) {
     std::lock_guard<std::mutex> guard (batch_mutex_);
 
-    if (new_size <= current_n_) {
+    if (new_size <= current_n_.load()) {
       return ReturnCodes::NEXT_BATCH;
     }
 
@@ -115,6 +115,9 @@ namespace Serving {
   }
 
   TensorMessage MXNetServable::GetResult(std::string client_id) {
+
+    std::unique_lock<std::mutex> lk(result_mutex_);
+    result_cv_.wait(lk, [this](){return done_processing_.load();});
 
     TensorMessage message;
     mx::NDArray &result_array = result_by_client_.at(client_id);
@@ -195,6 +198,8 @@ namespace Serving {
 
     std::lock_guard<std::mutex> guard_processing(batch_mutex_);
 
+    done_processing_ = false;
+
     this->MergeInputs_();
 
     current_batch_.CopyTo(&args_map_["data"]);
@@ -215,6 +220,8 @@ namespace Serving {
     // Reset everyone
     current_batch_ = 0.f;
     ready_to_process_ = false;
+    done_processing_ = true;
+    result_cv_.notify_all();
 
   }
 

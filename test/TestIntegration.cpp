@@ -208,7 +208,7 @@ namespace Serving {
                                                                    grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 
-      int batch_size = 2;
+      int batch_size = 50;
 
       {
         grpc::ClientContext context;
@@ -229,7 +229,6 @@ namespace Serving {
 
       int buflen;
       for (int i = 0; i < batch_size; i++) {
-        std::cout << i << std::endl;
         request_threads[i].join();
         TensorMessage &tensor_reply = results[i];
 

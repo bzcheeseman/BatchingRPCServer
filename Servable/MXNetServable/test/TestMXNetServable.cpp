@@ -242,15 +242,6 @@ namespace {
     Serving::TensorMessage output;
     int buflen;
 
-    tz.join();
-    output = servable.GetResult("zeros");
-    EXPECT_EQ(output.n(), 1);
-    buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 1.f);
-    }
-    output.clear_buffer();
-
     t1.join();
     t2.join();
     output = servable.GetResult("test");
@@ -258,6 +249,15 @@ namespace {
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
       EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
+    }
+    output.clear_buffer();
+
+    tz.join();
+    output = servable.GetResult("zeros");
+    EXPECT_EQ(output.n(), 1);
+    buflen = msg.buffer().size();
+    for (int i = 0; i < buflen; i++) {
+      EXPECT_EQ(output.buffer(i), 1.f);
     }
 
   }
@@ -316,6 +316,9 @@ namespace {
 
     std::thread t1 (ThreadedAdd, &servable, msg);
     std::thread t2 (ThreadedAdd, &servable, msg);
+    // Add must have occurred for the batch size modification to fail
+    t1.join();
+    t2.join();
 
     Serving::ReturnCodes r3 = servable.UpdateBatchSize(1);
     EXPECT_EQ(r3, Serving::ReturnCodes::NEXT_BATCH);
@@ -325,22 +328,20 @@ namespace {
     Serving::TensorMessage output;
     int buflen;
 
+    output = servable.GetResult("test");
+    EXPECT_EQ(output.n(), 2);
+    buflen = msg.buffer().size();
+    for (int i = 0; i < buflen; i++) {
+      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
+    }
+    output.clear_buffer();
+
     tz.join();
     output = servable.GetResult("zeros");
     EXPECT_EQ(output.n(), 1);
     buflen = msg.buffer().size();
     for (int i = 0; i < buflen; i++) {
       EXPECT_EQ(output.buffer(i), 1.f);
-    }
-    output.clear_buffer();
-
-    t1.join();
-    t2.join();
-    output = servable.GetResult("test");
-    EXPECT_EQ(output.n(), 2);
-    buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
     }
 
   }

@@ -119,19 +119,19 @@ namespace {
   };
 
   TEST_F(TestMXNetServable, Bind) {
-    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     EXPECT_NO_THROW(servable.Bind(raw_args));
   }
 
   TEST_F(TestMXNetServable, BindFile) {
-    Serving::MXNetServable servable (mx::Shape(16, 3, 256, 256), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(16, 3, 256, 256), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     EXPECT_NO_THROW(servable.Bind(file_args));
   }
 
   TEST_F(TestMXNetServable, Single) {
-    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     servable.Bind(raw_args);
 
@@ -153,7 +153,7 @@ namespace {
   }
 
   TEST_F(TestMXNetServable, NoBind) {
-    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     Serving::TensorMessage msg = ToMessage(input);
     msg.set_client_id("no_bind");
@@ -163,7 +163,7 @@ namespace {
   }
 
   TEST_F(TestMXNetServable, BadShape) {
-    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     servable.Bind(raw_args);
 
@@ -175,7 +175,7 @@ namespace {
   }
 
   TEST_F(TestMXNetServable, TooBig) {
-    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     servable.Bind(raw_args);
 
@@ -187,7 +187,7 @@ namespace {
   }
 
   TEST_F(TestMXNetServable, NextBatch) {
-    Serving::MXNetServable servable (mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     servable.Bind(raw_args);
 
@@ -204,20 +204,18 @@ namespace {
   }
 
   TEST_F(TestMXNetServable, Multiple) {
-    Serving::MXNetServable servable (mx::Shape(2, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(2, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     servable.Bind(raw_args);
 
     Serving::TensorMessage msg = ToMessage(input);
     msg.set_client_id("test");
 
-    std::thread t1 (ThreadedAdd, &servable, msg);
-    std::thread t2 (ThreadedAdd, &servable, msg);
+    std::thread t1 (ThreadedAdd, &servable, msg); t1.detach();
+    std::thread t2 (ThreadedAdd, &servable, msg); t2.detach();
 
-    t1.join();
-    t2.join();
     Serving::TensorMessage output;
-    Serving::ReturnCodes r = servable.GetResult("test", &output);
+    Serving::ReturnCodes r = servable.GetResult("test", &output); // this isn't blocking so everything gets destroyed?
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
 
     EXPECT_EQ(output.n(), 2);
@@ -230,7 +228,7 @@ namespace {
   }
 
   TEST_F(TestMXNetServable, MultipleClients) {
-    Serving::MXNetServable servable (mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     servable.Bind(raw_args);
 
@@ -239,16 +237,14 @@ namespace {
     Serving::TensorMessage z = ToMessage(zeros);
     z.set_client_id("zeros");
 
-    std::thread t1 (ThreadedAdd, &servable, msg);
-    std::thread t2 (ThreadedAdd, &servable, msg);
-    std::thread tz (ThreadedAdd, &servable, z);
+    std::thread t1 (ThreadedAdd, &servable, msg); t1.detach();
+    std::thread t2 (ThreadedAdd, &servable, msg); t2.detach();
+    std::thread tz (ThreadedAdd, &servable, z); tz.detach();
 
     Serving::TensorMessage output;
     int buflen;
     Serving::ReturnCodes r;
 
-    t1.join();
-    t2.join();
     r = servable.GetResult("test", &output);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 2);
@@ -258,7 +254,6 @@ namespace {
     }
     output.clear_buffer();
 
-    tz.join();
     r = servable.GetResult("zeros", &output);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 1);
@@ -324,16 +319,16 @@ namespace {
     Serving::TensorMessage z = ToMessage(zeros);
     z.set_client_id("zeros");
 
-    std::thread t1 (ThreadedAdd, &servable, msg);
-    std::thread t2 (ThreadedAdd, &servable, msg);
+    std::thread t1 (ThreadedAdd, &servable, msg); t1.detach();
+    std::thread t2 (ThreadedAdd, &servable, msg); t2.detach();
     // Add must have occurred for the batch size modification to fail
-    t1.join();
-    t2.join();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     Serving::ReturnCodes r3 = servable.UpdateBatchSize(1);
     EXPECT_EQ(r3, Serving::ReturnCodes::NEXT_BATCH);
 
-    std::thread tz (ThreadedAdd, &servable, z);
+    std::thread tz (ThreadedAdd, &servable, z); tz.detach();
 
     Serving::TensorMessage output;
     int buflen;
@@ -348,7 +343,6 @@ namespace {
     }
     output.clear_buffer();
 
-    tz.join();
     r = servable.GetResult("zeros", &output);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 1);
@@ -360,7 +354,7 @@ namespace {
   }
 
   TEST_F(TestMXNetServable, MultipleBatches) {
-    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::MXNetServable servable (mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
 
     servable.Bind(raw_args);
 
@@ -371,15 +365,14 @@ namespace {
     Serving::TensorMessage z = ToMessage(zeros);
     z.set_client_id("zeros");
 
-    std::thread t1 (ThreadedAdd, &servable, msg1);
-    std::thread t2 (ThreadedAdd, &servable, msg2);
-    std::thread tz (ThreadedAdd, &servable, z);
+    std::thread t1 (ThreadedAdd, &servable, msg1); t1.detach();
+    std::thread t2 (ThreadedAdd, &servable, msg2); t2.detach();
+    std::thread tz (ThreadedAdd, &servable, z); tz.detach();
 
     Serving::TensorMessage output;
     int buflen;
     Serving::ReturnCodes r;
 
-    t1.join();
     r = servable.GetResult("test1", &output);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 1);
@@ -389,7 +382,6 @@ namespace {
     }
     output.clear_buffer();
 
-    t2.join();
     r = servable.GetResult("test2", &output);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 1);
@@ -399,7 +391,6 @@ namespace {
     }
     output.clear_buffer();
 
-    tz.join();
     r = servable.GetResult("zeros", &output);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
     EXPECT_EQ(output.n(), 1);

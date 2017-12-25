@@ -33,7 +33,6 @@ namespace Serving {
   ) : input_shape_(input_shape), output_shape_(output_shape), ctx_(type, device_id),
       bind_called_(false), current_n_(0) {
 
-    current_batch_ = mx::NDArray(input_shape_, ctx_);
     args_map_["data"] = mx::NDArray(input_shape_, ctx_);
 
   }
@@ -43,24 +42,14 @@ namespace Serving {
   }
 
   ReturnCodes MXNetServable::UpdateBatchSize(const int &new_size) {
-    std::lock_guard<std::mutex> guard (batch_mutex_);
+    std::lock_guard<std::mutex> guard_input (input_mutex_);
 
     if (new_size <= current_n_.load()) {
       return ReturnCodes::NEXT_BATCH;
     }
 
-    int old_n = input_shape_[0];
     // Reshape the input
     input_shape_ = mx::Shape(new_size, input_shape_[1], input_shape_[2], input_shape_[3]);
-    mx::NDArray new_current_batch = mx::NDArray(input_shape_, ctx_);
-    new_current_batch = 0.f;
-
-    // Copy over current items
-    new_current_batch.Slice(0, old_n) += current_batch_;
-
-    // Do the swap
-    current_batch_ = mx::NDArray(input_shape_, ctx_);
-    new_current_batch.CopyTo(&current_batch_);
 
     // Re-bind the executor with the new batch size
     args_map_["data"] = mx::NDArray(input_shape_, ctx_);
@@ -73,6 +62,7 @@ namespace Serving {
   ReturnCodes MXNetServable::AddToBatch(const TensorMessage &message) {
 
     const std::string &client_id = message.client_id();
+    std::vector<float> message_data (message.buffer().data(), message.buffer().data() + message.buffer_size());
 
     if (!bind_called_) {
       return ReturnCodes::NEED_BIND_CALL;
@@ -87,22 +77,26 @@ namespace Serving {
     }
 
     if (message.n() + current_n_.load() > input_shape_[0]) {
-      ProcessCurrentBatch_();
       return ReturnCodes::NEXT_BATCH;
     }
 
-    { // critical region - adds inputs to batch and does processing if needed
+    {
 
       std::lock_guard<std::mutex> guard_input(input_mutex_);
 
-      input_by_client_[client_id].emplace_back(
+      if (idx_by_client_.find(client_id) == idx_by_client_.end()) {
+        idx_by_client_[client_id] = std::make_pair(current_n_.load(), current_n_.load() + message.n());
+      } else {
+        idx_by_client_[client_id].second += message.n();
+      }
+
+      current_batch_.emplace_back(
               mx::NDArray(message.buffer().data(),
-                          mx::Shape(message.n(), input_shape_[1], input_shape_[2], input_shape_[3]),
-                          ctx_)
+                          mx::Shape(message.n(), input_shape_[1], input_shape_[2], input_shape_[3]), ctx_)
       );
+
       current_n_ += message.n();
       if (current_n_ <= input_shape_[0]) {
-        current_batch_clients_.emplace(client_id);
         if (current_n_ == input_shape_[0]) {
           ProcessCurrentBatch_();
         }
@@ -116,14 +110,26 @@ namespace Serving {
   ReturnCodes MXNetServable::GetResult(const std::string &client_id, TensorMessage *message) {
 
     std::unique_lock<std::mutex> lk(result_mutex_);
-    result_cv_.wait(lk, [&, this](){return done_processing_by_client_.at(client_id);});
+    result_cv_.wait(lk, [&, this](){ // this is blocking incorrectly, it's blocking when it shouldn't be sometimes
+      auto done = done_processing_by_client_.find(client_id);
+      if (done != done_processing_by_client_.end()) {
+        done = done_processing_by_client_.erase(done);
+        return true;
+      }
+      else {
+        return false;
+      }
+    });
 
-    mx::NDArray &result_array = result_by_client_.at(client_id);
+    auto result = result_by_client_.find(client_id);
+    mx::NDArray &result_array = result->second;
 
     std::vector<mx_uint> result_shape = result_array.GetShape();
 
     google::protobuf::RepeatedField<float> data(result_array.GetData(), result_array.GetData()+result_array.Size());
     message->mutable_buffer()->Swap(&data);
+    result = result_by_client_.erase(result);
+
 
     message->set_n(result_shape[0]);
     message->set_k(result_shape[1]);
@@ -131,14 +137,13 @@ namespace Serving {
     message->set_nc(result_shape[3]);
     message->set_client_id(client_id);
 
-    result_by_client_.erase(client_id);
-    done_processing_by_client_.erase(client_id);
-
     return ReturnCodes::OK;
 
   }
 
   ReturnCodes MXNetServable::Bind(BindArgs &args) {
+    bind_called_ = true;
+
     try {
       RawBindArgs &raw_args = dynamic_cast<RawBindArgs &>(args);
       servable_ = raw_args.net;
@@ -169,15 +174,12 @@ namespace Serving {
   // Private methods //
 
   void MXNetServable::BindExecutor_() {
+
     executor_ = servable_.SimpleBind(ctx_, args_map_,
                                      std::map<std::string, mx::NDArray>(), std::map<std::string, mx::OpReqType>(),
                                      aux_map_);
 
     bind_called_ = true;
-  }
-
-  void MXNetServable::UpdateClientIDX_(const std::string &client_id, mx_uint &&msg_n) {
-    idx_by_client_[client_id].push_back(msg_n);
   }
 
   void MXNetServable::LoadParameters_(std::map<std::string, mx::NDArray> &parameters) {
@@ -197,58 +199,29 @@ namespace Serving {
 
   void MXNetServable::ProcessCurrentBatch_() {
 
-    std::lock_guard<std::mutex> guard_processing(batch_mutex_);
+    mx::Operator("concat")(current_batch_)
+            .SetParam("dim", 0)
+            .SetParam("num_args", input_shape_[0])
+            .Invoke(args_map_["data"]);
 
-    this->MergeInputs_();
-
-    current_batch_.CopyTo(&args_map_["data"]);
-
-    executor_->Forward(false);
+    executor_->Forward(false); // why does this segfault?
 
     mx::NDArray &result = executor_->outputs[0];
     mx::NDArray::WaitAll();
 
     for (auto &client_idx: idx_by_client_) {
-      int client_batch_size = client_idx.second[1] - client_idx.second[0];
+      int client_batch_size = client_idx.second.second - client_idx.second.first;
       result_by_client_[client_idx.first] = mx::NDArray(mx::Shape(client_batch_size, output_shape_[1]), ctx_);
       result_by_client_[client_idx.first] = 0.f;
-      result_by_client_[client_idx.first] += result.Slice(client_idx.second[0], client_idx.second[1]);
-      done_processing_by_client_[client_idx.first] = true;
+      result_by_client_[client_idx.first] += result.Slice(client_idx.second.first, client_idx.second.second);
+      done_processing_by_client_.emplace(client_idx.first);
     }
 
     // Reset everyone
-    current_batch_ = 0.f;
+    current_batch_.clear();
     result_cv_.notify_all();
     current_n_ = 0;
 
-  }
-
-  void MXNetServable::MergeInputs_() {
-
-    size_t num_client_inputs = 0;
-
-    current_batch_ = 0.f;
-
-    mx_uint client_input_begin, current_input_end;
-
-    mx_uint current_batch_n = 0;
-
-    for (auto &client : current_batch_clients_) {
-      auto input_arrays_by_client = input_by_client_.find(client);
-      std::vector<mx::NDArray> &input_arrays = input_arrays_by_client->second;
-
-      num_client_inputs = input_arrays.size();
-      client_input_begin = current_batch_n;
-
-      for (size_t i = 0; i < num_client_inputs; i++) {
-        current_input_end = input_arrays_by_client->second[i].GetShape()[0];
-        current_batch_.Slice(current_batch_n, current_batch_n+current_input_end) += input_arrays_by_client->second[i];
-        current_batch_n += current_input_end;
-      }
-      idx_by_client_[client] = {client_input_begin, current_batch_n};
-    }
-    input_by_client_.clear();
-    current_batch_clients_.clear();
   }
 
 } // Serving

@@ -119,7 +119,7 @@ namespace Serving {
       Serving::TensorMessage msg;
 
       mx::Context *ctx;
-      int n_hidden = 600;
+      int n_hidden = 2000;
       mx::NDArray input;
 
       Serving::RawBindArgs raw_args;

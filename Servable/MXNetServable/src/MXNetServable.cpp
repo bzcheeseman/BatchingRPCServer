@@ -113,7 +113,7 @@ namespace Serving {
   ReturnCodes MXNetServable::GetResult(const std::string &client_id, TensorMessage *message) {
 
     std::unique_lock<std::mutex> lk(result_mutex_);
-    result_cv_.wait(lk, [&, this](){ // this is blocking incorrectly, it's blocking when it shouldn't be sometimes
+    result_cv_.wait(lk, [&, this](){ // This will block forever if the client only calls GetResult and never AddToBatch
       auto done = done_processing_by_client_.find(client_id);
       if (done != done_processing_by_client_.end()) {
         done = done_processing_by_client_.erase(done);

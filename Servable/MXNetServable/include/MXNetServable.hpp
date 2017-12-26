@@ -86,9 +86,7 @@ namespace Serving {
     std::map<std::string, std::pair<mx_uint, mx_uint>> idx_by_client_;
     std::vector<mx::NDArray> current_batch_;
 
-    std::atomic<mx_uint> current_n_;
-
-    std::mutex batch_mutex_;
+    mx_uint current_n_;
 
     std::mutex result_mutex_;
     std::condition_variable result_cv_;
@@ -102,8 +100,6 @@ namespace Serving {
     std::map<std::string, mx::NDArray> args_map_; // inputs (data and model parameters) are args
     std::map<std::string, mx::NDArray> aux_map_; // everyone else is aux
 
-    // Serving vars
-    std::atomic<bool> ready_to_process_;
   };
 
 } // Serving

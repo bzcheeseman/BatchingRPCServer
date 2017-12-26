@@ -246,7 +246,7 @@ namespace Serving {
                                                                    grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
 
-      int batch_size = 20;
+      int batch_size = 50;
 
       {
         grpc::ClientContext context;

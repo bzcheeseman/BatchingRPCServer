@@ -42,9 +42,9 @@ namespace Serving {
   }
 
   ReturnCodes MXNetServable::UpdateBatchSize(const int &new_size) {
-    std::lock_guard<std::mutex> guard_input (input_mutex_);
+    std::unique_lock<std::mutex> guard_input (input_mutex_);
 
-    if (new_size <= current_n_.load()) {
+    if (new_size <= current_n_) {
       return ReturnCodes::NEXT_BATCH;
     }
 
@@ -59,6 +59,7 @@ namespace Serving {
 
   }
 
+  // similar to enqueue in https://github.com/Youka/ThreadPool/blob/master/ThreadPool.hpp
   ReturnCodes MXNetServable::AddToBatch(const TensorMessage &message) {
 
     const std::string &client_id = message.client_id();
@@ -76,16 +77,16 @@ namespace Serving {
       return ReturnCodes::SHAPE_INCORRECT;
     }
 
-    if (message.n() + current_n_.load() > input_shape_[0]) {
-      return ReturnCodes::NEXT_BATCH;
-    }
-
     {
 
-      std::lock_guard<std::mutex> guard_input(input_mutex_);
+      std::unique_lock<std::mutex> guard_input(input_mutex_);
+
+      if (message.n() + current_n_ > input_shape_[0]) {
+        return ReturnCodes::NEXT_BATCH;
+      }
 
       if (idx_by_client_.find(client_id) == idx_by_client_.end()) {
-        idx_by_client_[client_id] = std::make_pair(current_n_.load(), current_n_.load() + message.n());
+        idx_by_client_[client_id] = std::make_pair(current_n_, current_n_ + message.n());
       } else {
         idx_by_client_[client_id].second += message.n();
       }

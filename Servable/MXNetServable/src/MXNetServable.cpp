@@ -42,7 +42,7 @@ namespace Serving {
   }
 
   ReturnCodes MXNetServable::UpdateBatchSize(const int &new_size) {
-    std::unique_lock<std::mutex> guard_input (input_mutex_);
+    std::lock_guard<std::mutex> guard_input (input_mutex_);
 
     if (new_size <= current_n_) {
       return ReturnCodes::NEXT_BATCH;
@@ -79,11 +79,13 @@ namespace Serving {
 
     {
 
-      std::unique_lock<std::mutex> guard_input(input_mutex_);
+      std::lock_guard<std::mutex> guard_input(input_mutex_);
 
       if (message.n() + current_n_ > input_shape_[0]) {
         return ReturnCodes::NEXT_BATCH;
       }
+
+      result_by_client_.erase(client_id); // clears room for the new result
 
       if (idx_by_client_.find(client_id) == idx_by_client_.end()) {
         idx_by_client_[client_id] = std::make_pair(current_n_, current_n_ + message.n());
@@ -217,6 +219,8 @@ namespace Serving {
       result_by_client_[client_idx.first] += result.Slice(client_idx.second.first, client_idx.second.second);
       done_processing_by_client_.emplace(client_idx.first);
     }
+
+    idx_by_client_.clear();
 
     // Reset everyone
     current_batch_.clear();

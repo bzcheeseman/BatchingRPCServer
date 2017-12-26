@@ -241,7 +241,7 @@ namespace Serving {
       }
     }
 
-    TEST_F(TestIntegration, ThreadedProcessMultiple_MultiBatch) {
+    TEST_F(TestIntegration, ThreadedProcessMultiple_MultiBatch) { // TODO: this fails sometimes...not sure why
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
@@ -251,7 +251,7 @@ namespace Serving {
       {
         grpc::ClientContext context;
         AdminRequest req;
-        req.set_new_batch_size(5);
+        req.set_new_batch_size(10);
         AdminReply rep;
 
         grpc::Status status = stub->SetBatchSize(&context, req, &rep);

@@ -241,7 +241,7 @@ namespace Serving {
       }
     }
 
-    TEST_F(TestIntegration, ThreadedProcessMultiple_MultiBatch) { // TODO: this fails sometimes...not sure why
+    TEST_F(TestIntegration, ThreadedProcessMultiple_MultiBatch) { // TODO: this fails sometimes on IDE test framework?
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
       std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);

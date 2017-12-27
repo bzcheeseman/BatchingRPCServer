@@ -27,6 +27,14 @@
 // Generated
 #include "BatchingRPC.pb.h"
 
+/**
+ * @namespace Serving
+ * @brief Top level namespace for this project
+ *
+ * Defines the namespace within which all the code in this project resides. Protobuf generates code
+ * under this namespace so for uniformity everything lives under this namespace. No subdivisions
+ * exist as of 26/12/2017.
+ */
 namespace Serving {
 
   /**

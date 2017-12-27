@@ -44,7 +44,7 @@ namespace Serving {
   }
 
   grpc::Status TBServer::SetBatchSize(grpc::ServerContext *ctx, const AdminRequest *req, AdminReply *rep) {
-    ReturnCodes code = servable_->UpdateBatchSize(req->new_batch_size());
+    ReturnCodes code = servable_->SetBatchSize(req->new_batch_size());
 
     switch (code) {
       case OK: break;

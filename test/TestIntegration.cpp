@@ -63,7 +63,7 @@ namespace Serving {
       return message;
     }
 
-    void ThreadProcess(std::unique_ptr<BatchingServable::Stub> &stub, TensorMessage msg, TensorMessage &reply) {
+    void ThreadProcess(std::unique_ptr<BatchingServer::Stub> &stub, TensorMessage msg, TensorMessage &reply) {
       grpc::Status status;
       ConnectionReply rep;
 
@@ -128,7 +128,7 @@ namespace Serving {
     TEST_F(TestIntegration, Connect) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       grpc::ClientContext context;
 
@@ -143,7 +143,7 @@ namespace Serving {
     TEST_F(TestIntegration, SetBatchSize) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       grpc::ClientContext context;
 
@@ -159,7 +159,7 @@ namespace Serving {
     TEST_F(TestIntegration, Process) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       ConnectionReply rep;
       grpc::Status status;
@@ -190,7 +190,7 @@ namespace Serving {
     TEST_F(TestIntegration, ThreadedProcessSingle) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       TensorMessage tensor_reply;
 
@@ -206,7 +206,7 @@ namespace Serving {
     TEST_F(TestIntegration, ThreadedProcessMultiple_SingleBatch) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       int batch_size = 50;
 
@@ -241,10 +241,10 @@ namespace Serving {
       }
     }
 
-    TEST_F(TestIntegration, ThreadedProcessMultiple_MultiBatch) { // TODO: this fails sometimes on IDE test framework?
+    TEST_F(TestIntegration, ThreadedProcessMultiple_MultiBatch) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051",
                                                                    grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       int batch_size = 50;
 

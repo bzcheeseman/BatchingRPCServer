@@ -35,7 +35,7 @@ namespace Serving {
       EchoServable() = default;
       ~EchoServable() override = default;
 
-      ReturnCodes UpdateBatchSize(const int &new_size) override {
+      ReturnCodes SetBatchSize(const int &new_size) override {
         return OK;
       }
 
@@ -89,7 +89,7 @@ namespace Serving {
 
     TEST_F(TestTBServer, Connect) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       grpc::ClientContext context;
 
@@ -103,7 +103,7 @@ namespace Serving {
 
     TEST_F(TestTBServer, SetBatchSize) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       grpc::ClientContext context;
 
@@ -118,7 +118,7 @@ namespace Serving {
 
     TEST_F(TestTBServer, Process) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       ConnectionReply rep;
       grpc::Status status;
@@ -148,7 +148,7 @@ namespace Serving {
 
     TEST_F(TestTBServer, FailProcess) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       msg.set_client_id("test");
 
@@ -165,7 +165,7 @@ namespace Serving {
 
     TEST_F(TestTBServer, Reconnect) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       ConnectionReply rep;
       grpc::Status status;
@@ -187,7 +187,7 @@ namespace Serving {
 
     TEST_F(TestTBServer, MultipleProcess) {
       std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-      std::unique_ptr<BatchingServable::Stub> stub = BatchingServable::NewStub(channel);
+      std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
 
       ConnectionReply rep;
       grpc::Status status;

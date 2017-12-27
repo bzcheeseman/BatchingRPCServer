@@ -40,7 +40,7 @@ namespace Serving {
     if (bind_called_) delete executor_;
   }
 
-  ReturnCodes MXNetServable::UpdateBatchSize(const int &new_size) {
+  ReturnCodes MXNetServable::SetBatchSize(const int &new_size) {
     std::lock_guard<std::mutex> guard_input (input_mutex_);
 
     if (new_size <= current_n_) {
@@ -81,6 +81,7 @@ namespace Serving {
       std::lock_guard<std::mutex> guard_input(input_mutex_);
 
       if (message.n() + current_n_ > input_shape_[0]) {
+        ProcessCurrentBatch_();
         return ReturnCodes::NEXT_BATCH;
       }
 
@@ -203,10 +204,10 @@ namespace Serving {
 
     mx::Operator("concat")(current_batch_)
             .SetParam("dim", 0)
-            .SetParam("num_args", input_shape_[0])
+            .SetParam("num_args", current_batch_.size())
             .Invoke(args_map_["data"]);
 
-    executor_->Forward(false); // why does this segfault?
+    executor_->Forward(false);
 
     mx::NDArray &result = executor_->outputs[0];
     mx::NDArray::WaitAll();

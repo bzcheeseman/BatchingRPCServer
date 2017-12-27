@@ -62,7 +62,7 @@ namespace Serving {
 
     ~MXNetServable() override ;
 
-    ReturnCodes UpdateBatchSize(const int &new_size) override ;
+    ReturnCodes SetBatchSize(const int &new_size) override ;
 
     ReturnCodes AddToBatch(const TensorMessage &message) override ;
 

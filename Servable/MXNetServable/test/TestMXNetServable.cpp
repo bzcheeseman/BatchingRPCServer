@@ -276,7 +276,7 @@ namespace {
 
     std::thread t1 (ThreadedAdd, &servable, msg);
 
-    Serving::ReturnCodes r2 = servable.UpdateBatchSize(3);
+    Serving::ReturnCodes r2 = servable.SetBatchSize(3);
     EXPECT_EQ(r2, Serving::ReturnCodes::OK);
 
 
@@ -325,7 +325,7 @@ namespace {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-    Serving::ReturnCodes r3 = servable.UpdateBatchSize(1);
+    Serving::ReturnCodes r3 = servable.SetBatchSize(1);
     EXPECT_EQ(r3, Serving::ReturnCodes::NEXT_BATCH);
 
     std::thread tz (ThreadedAdd, &servable, z); tz.detach();

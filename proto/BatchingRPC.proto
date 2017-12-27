@@ -48,9 +48,8 @@ message AdminReply {}
      - Receive your uuid
      - Send Process calls with the returned uuid as the message client_id
 */
-service BatchingServable {
+service BatchingServer {
     rpc Connect(ConnectionRequest) returns (ConnectionReply) {}
     rpc Process (TensorMessage) returns (TensorMessage) {}
     rpc SetBatchSize(AdminRequest) returns (AdminReply) {}
-    // TODO: add admin endpoints for things like updating batch size, servable, etc.
 }

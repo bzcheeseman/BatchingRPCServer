@@ -60,3 +60,9 @@ target_link_libraries(BatchingRPCServer PUBLIC ${LIBS})
 target_include_directories(BatchingRPCServer PUBLIC ${INCLUDE_DIRS})
 
 add_integration(BatchingRPCServer)
+
+# Add cmake target so we can also call make doc to create the documentation
+add_custom_target(doc
+        COMMAND doxygen ./Doxyfile
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/doc
+)

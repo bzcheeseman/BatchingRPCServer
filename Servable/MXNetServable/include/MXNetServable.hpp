@@ -20,7 +20,6 @@
     limitations under the License.
  */
 
-
 #ifndef BATCHING_RPC_SERVER_MXNETSERVABLE_HPP
 #define BATCHING_RPC_SERVER_MXNETSERVABLE_HPP
 
@@ -51,29 +50,30 @@ namespace Serving {
     std::string parameters_filename;
   };
 
-  class MXNetServable: public Servable {
+  class MXNetServable : public Servable {
   public:
     MXNetServable(
-            const mx::Shape &input_shape,
-            const mx::Shape &output_shape,
-            const mx::DeviceType &type,
-            const int &device_id
-    );
+        const mx::Shape &input_shape, const mx::Shape &output_shape,
+        const mx::DeviceType &type, const int &device_id);
 
-    ~MXNetServable() override ;
+    ~MXNetServable() override;
 
-    ReturnCodes SetBatchSize(const int &new_size) override ;
+    ReturnCodes SetBatchSize(const int &new_size) override;
 
-    ReturnCodes AddToBatch(const TensorMessage &message) override ;
+    ReturnCodes AddToBatch(const TensorMessage &message) override;
 
-    ReturnCodes GetResult(const std::string &client_id, TensorMessage *message) override ;
+    ReturnCodes
+    GetResult(const std::string &client_id, TensorMessage *message) override;
 
-    ReturnCodes Bind(BindArgs &args) override ;
+    ReturnCodes Bind(BindArgs &args) override;
 
   private:
+    void SetBatchSize_(const int &new_size);
 
     void BindExecutor_();
+
     void LoadParameters_(std::map<std::string, mx::NDArray> &parameters);
+
     void ProcessCurrentBatch_();
 
     // Basic I/O requirements
@@ -95,14 +95,13 @@ namespace Serving {
 
     // MXNet requirements for running
     mx::Context ctx_;
-    mx::Symbol servable_; // see feature_extract.cpp for how to load models from files
+    mx::Symbol servable_;
     mx::Executor *executor_;
-    std::map<std::string, mx::NDArray> args_map_; // inputs (data and model parameters) are args
+    std::map<std::string, mx::NDArray>
+        args_map_; // inputs (data and model parameters) are args
     std::map<std::string, mx::NDArray> aux_map_; // everyone else is aux
-
   };
 
-} // Serving
+} // namespace Serving
 
-
-#endif //BATCHING_RPC_SERVER_MXNETSERVABLE_HPP
+#endif // BATCHING_RPC_SERVER_MXNETSERVABLE_HPP

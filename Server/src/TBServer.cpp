@@ -20,36 +20,33 @@
     limitations under the License.
  */
 
-
 #include "TBServer.hpp"
 
 using grpc::Server;
-using grpc::ServerContext;
 using grpc::ServerAsyncResponseWriter;
 using grpc::ServerBuilder;
-using grpc::ServerContext;
 using grpc::ServerCompletionQueue;
+using grpc::ServerContext;
+using grpc::ServerContext;
 using grpc::Status;
 
 namespace Serving {
 
-  TBServer::TBServer(
-          Servable *servable
-  ): servable_(servable) {
-    ;
-  }
+  TBServer::TBServer(Servable *servable) : servable_(servable) { ; }
 
-  TBServer::~TBServer() {
-    ;
-  }
+  TBServer::~TBServer() { ; }
 
-  grpc::Status TBServer::SetBatchSize(grpc::ServerContext *ctx, const AdminRequest *req, AdminReply *rep) {
+  grpc::Status TBServer::SetBatchSize(
+      grpc::ServerContext *ctx, const AdminRequest *req, AdminReply *rep) {
     ReturnCodes code = servable_->SetBatchSize(req->new_batch_size());
 
     switch (code) {
-      case OK: break;
+      case OK:
+        break;
       case NEXT_BATCH: {
-        grpc::Status early_exit_status (grpc::UNAVAILABLE, "Batch is already larger than requested size, retry");
+        grpc::Status early_exit_status(
+            grpc::UNAVAILABLE,
+            "Batch is already larger than requested size, retry");
         return early_exit_status;
       }
     }
@@ -57,7 +54,8 @@ namespace Serving {
     return grpc::Status::OK;
   }
 
-  Status TBServer::Connect(ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) {
+  Status TBServer::Connect(
+      ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) {
 
     uuid_t uuid;
     uuid_generate(uuid);
@@ -70,44 +68,56 @@ namespace Serving {
     return Status::OK;
   }
 
-  grpc::Status TBServer::Process(ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) {
+  grpc::Status TBServer::Process(
+      ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) {
 
     auto user = users_.find(req->client_id());
     if (user == users_.end()) {
-      grpc::Status early_exit_status (grpc::FAILED_PRECONDITION, "Connect not called, client id unknown");
+      grpc::Status early_exit_status(
+          grpc::FAILED_PRECONDITION, "Connect not called, client id unknown");
       return early_exit_status;
     }
 
-    // TODO: make sure that this is all going to the same servable - only one instance!
-    ReturnCodes code = servable_->AddToBatch(*req); // Add to batch and move to the next stage
+    // TODO: make sure that this is all going to the same instance
+    ReturnCodes code = servable_->AddToBatch(*req); // Add to batch and move on
 
     switch (code) {
-      case OK: break;
+      case OK:
+        break;
       case NEED_BIND_CALL: {
-        grpc::Status early_exit_status (grpc::FAILED_PRECONDITION, "Bind not called on servable");
+        grpc::Status early_exit_status(
+            grpc::FAILED_PRECONDITION, "Bind not called on servable");
         return early_exit_status;
       }
       case SHAPE_INCORRECT: {
-        grpc::Status early_exit_status (grpc::INVALID_ARGUMENT, "Input tensor shape incorrect");
+        grpc::Status early_exit_status(
+            grpc::INVALID_ARGUMENT, "Input tensor shape incorrect");
         return early_exit_status;
       }
       case NEXT_BATCH: {
-        grpc::Status early_exit_status (grpc::UNAVAILABLE, "Attempted to add to already full batch");
+        grpc::Status early_exit_status(
+            grpc::UNAVAILABLE, "Attempted to add to already full batch");
         return early_exit_status;
       }
       case BATCH_TOO_LARGE: {
-        grpc::Status early_exit_status (grpc::INVALID_ARGUMENT, "Batch request was too large, split into smaller pieces and retry");
+        grpc::Status early_exit_status(
+            grpc::INVALID_ARGUMENT,
+            "Batch request was too large, split into smaller pieces and retry");
         return early_exit_status;
       }
-      case NO_SUITABLE_BIND_ARGS: break; // this one won't be thrown by the function
+      case NO_SUITABLE_BIND_ARGS:
+        break; // this one won't be thrown by the function
     }
 
     code = servable_->GetResult(req->client_id(), rep);
 
     switch (code) {
-      case OK: break;
+      case OK:
+        break;
       case NEXT_BATCH: {
-        grpc::Status early_exit_status (grpc::UNAVAILABLE, "Try again later, processing hasn't yet started!");
+        grpc::Status early_exit_status(
+            grpc::UNAVAILABLE,
+            "Try again later, processing hasn't yet started!");
         return early_exit_status;
       }
     }
@@ -121,7 +131,7 @@ namespace Serving {
     builder.RegisterService(this);
     server_ = builder.BuildAndStart();
 
-    serve_thread_ = std::thread([&](){server_->Wait();});
+    serve_thread_ = std::thread([&]() { server_->Wait(); });
   }
 
   void TBServer::Stop() {
@@ -129,13 +139,13 @@ namespace Serving {
     serve_thread_.join();
   }
 
-//  void TBServer::StartSSL(const std::string &server_address) {
-//    ServerBuilder builder;
-//    builder.AddListeningPort(server_address, grpc::SslServerCredentials());
-//    builder.RegisterService(this);
-//    server_ = builder.BuildAndStart();
-//
-//    serve_thread_ = std::thread([&](){server_->Wait();});
-//  }
+  //  void TBServer::StartSSL(const std::string &server_address) {
+  //    ServerBuilder builder;
+  //    builder.AddListeningPort(server_address, grpc::SslServerCredentials());
+  //    builder.RegisterService(this);
+  //    server_ = builder.BuildAndStart();
+  //
+  //    serve_thread_ = std::thread([&](){server_->Wait();});
+  //  }
 
-}
+} // namespace Serving

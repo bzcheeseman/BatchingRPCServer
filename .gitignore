@@ -90,8 +90,5 @@ build/
 cmake-build-debug/
 .idea/
 
-*.pb.h
-*.pb.cc
-*.pb.grpc.h
-*.pb.grpc.cc
+!docs/
 

@@ -112,7 +112,8 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # Configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = ../proto \
+INPUT                  = ../README.md \
+                         ../proto \
                          ../Servable \
                          ../Server \
                          ../test

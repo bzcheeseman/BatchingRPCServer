@@ -22,7 +22,7 @@ endfunction()
 
 function(add_integration)
     if(NOT ARGN)
-        message(SEND_ERROR "Error: No Libraries to link to! called without any proto files")
+        message(SEND_ERROR "Error: No Libraries to link to!")
         return()
     endif()
     add_executable(TestIntegration EXCLUDE_FROM_ALL ${CMAKE_CURRENT_SOURCE_DIR}/test/TestIntegration.cpp)

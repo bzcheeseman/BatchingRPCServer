@@ -92,3 +92,5 @@ cmake-build-debug/
 
 !docs/
 
+build_env.sh
+

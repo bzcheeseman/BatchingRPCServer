@@ -38,7 +38,7 @@ RUN git clone --recursive --branch v1.8.2 --single-branch https://github.com/grp
 # ------ MXNet ------
 WORKDIR /opt/mxnet
 
-RUN make -j4 USE_CPP_PACKAGE=1 USE_CUDA_PATH=/usr/local/cuda USE_CUDA=1 USE_CUDNN=1 USE_BLAS=openblas USE_GPERFTOOLS=1
+RUN make USE_CPP_PACKAGE=1 USE_CUDA_PATH=/usr/local/cuda USE_CUDA=1 USE_CUDNN=1 USE_BLAS=openblas USE_GPERFTOOLS=1
 
 RUN ln -s /opt/mxnet/lib/libmxnet.so /usr/lib; \
     mkdir /usr/include/mxnet; \

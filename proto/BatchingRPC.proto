@@ -28,6 +28,7 @@ message TensorMessage {
     int32 nr = 4;
     int32 nc = 5;
     string client_id = 6;
+    string serialized_buffer = 7;
 }
 
 message ConnectionRequest {}

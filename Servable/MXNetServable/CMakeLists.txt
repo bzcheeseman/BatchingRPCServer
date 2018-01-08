@@ -8,7 +8,7 @@ find_package(MXNet REQUIRED)
 file(GLOB servable_src ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 file(GLOB servable_include ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
 
-find_package(protobuf 3.5 REQUIRED)
+find_package(Protobuf 3.5 REQUIRED)
 
 file(GLOB proto_files ${CMAKE_SOURCE_DIR}/proto/*.proto)
 

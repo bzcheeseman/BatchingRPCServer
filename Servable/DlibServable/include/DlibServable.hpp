@@ -23,7 +23,14 @@
 #ifndef BATCHINGRPCSERVER_DLIBSERVABLE_HPP
 #define BATCHINGRPCSERVER_DLIBSERVABLE_HPP
 
-// MXNet
+// STL
+#include <map>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <condition_variable>
+
+// Dlib
 #include "dlib/dnn.h"
 
 // Project
@@ -94,6 +101,7 @@ namespace Serving {
     current_n_ = 0;
     batch_size_ = batch_size;
     bind_called_ = false;
+    current_batch_.reserve(batch_size_);
   }
 
   template<class NetType, class InputType, class OutputType>
@@ -119,7 +127,7 @@ namespace Serving {
   ReturnCodes DlibServable<NetType, InputType, OutputType>::AddToBatch(
       const TensorMessage &message) {
     const std::string &client_id = message.client_id();
-    InputType input;
+    std::vector<InputType> input;
     std::stringstream message_stream(message.serialized_buffer());
 
     if (!bind_called_) {
@@ -131,6 +139,10 @@ namespace Serving {
     }
 
     dlib::deserialize(input, message_stream);
+
+    if (input.size() != message.n()) {
+      return ReturnCodes::SHAPE_INCORRECT;
+    }
 
     {
 
@@ -151,7 +163,8 @@ namespace Serving {
         idx_by_client_[client_id].second += message.n();
       }
 
-      current_batch_.emplace_back(input);
+      // Clients could send us multiple inputs, we need to deal with that properly.
+      current_batch_.insert(current_batch_.end(), input.begin(), input.end());
 
       current_n_ += message.n();
       if (current_n_ <= batch_size_) {
@@ -221,6 +234,7 @@ namespace Serving {
   void DlibServable<NetType, InputType, OutputType>::SetBatchSize_(
       const int &new_size) {
     batch_size_ = new_size;
+    current_batch_.reserve(batch_size_);
   }
 
   template<class NetType, class InputType, typename OutputType>

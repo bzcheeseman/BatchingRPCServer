@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 set(CMAKE_FIND_FRAMEWORK LAST)
 
-find_package(protobuf 3.5 REQUIRED)
+find_package(Protobuf 3.5 REQUIRED)
 find_package(GRPC 1.5 REQUIRED)
 find_package(UUID 1.5 REQUIRED)
 

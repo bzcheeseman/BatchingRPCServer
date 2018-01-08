@@ -23,22 +23,26 @@
 
 find_path(MXNET_INCLUDE
         NAMES mxnet/c_api.h
-        PATHS $ENV{MXNET_ROOT}/include
+        PATHS
+        $ENV{MXNET_ROOT}/include
 )
 
 find_path(MXNET_NNVM_INCLUDE
         NAMES nnvm/c_api.h
-        PATHS $ENV{MXNET_ROOT}/nnvm/include
+        PATHS
+        $ENV{MXNET_ROOT}/nnvm/include
 )
 
 find_path(MXNET_DMLC_INCLUDE
         NAMES dmlc/any.h
-        PATHS $ENV{MXNET_ROOT}/dmlc-core/include
+        PATHS
+        $ENV{MXNET_ROOT}/dmlc-core/include
 )
 
 find_path(MXNET_CPP_INCLUDE
         NAMES mxnet-cpp/MxNetCpp.h
-        PATHS $ENV{MXNET_ROOT}/cpp-package/include
+        PATHS
+        $ENV{MXNET_ROOT}/cpp-package/include
 )
 
 list(APPEND MXNET_INCLUDE_DIRS ${MXNET_INCLUDE})
@@ -48,7 +52,7 @@ list(APPEND MXNET_INCLUDE_DIRS ${MXNET_CPP_INCLUDE})
 
 find_library(MXNET_LIBRARY
         NAMES mxnet
-        PATHS $ENV{MXNET_ROOT}/lib
+        PATHS $ENV{MXNET_ROOT}/lib /usr/lib/
 )
 
 list(APPEND MXNET_LIBS ${MXNET_LIBRARY})

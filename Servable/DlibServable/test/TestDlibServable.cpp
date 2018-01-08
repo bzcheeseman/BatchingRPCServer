@@ -54,8 +54,9 @@ namespace {
         dirname, training_images, training_labels, testing_images,
         testing_labels);
 
-    std::ifstream f("mnist_network.dat");
+    std::ifstream f("../../../Servable/DlibServable/test/assets/mnist_network.dat");
     if (f.is_open()) {
+      f.close();
       return;
     }
 
@@ -68,15 +69,15 @@ namespace {
     trainer.set_synchronization_file("mnist_sync", std::chrono::seconds(20));
     trainer.train(training_images, training_labels);
     net.clean();
-    serialize("mnist_network.dat") << net;
+    serialize("../../../Servable/DlibServable/test/assets/mnist_network.dat") << net;
   }
 
   class TestDlibServable : public ::testing::Test {
   protected:
     void SetUp() override {
       TrainNetwork("../../../Servable/DlibServable/test/assets");
-      deserialize("mnist_network.dat") >> raw_args.net;
-      file_args.filename = "mnist_network.dat";
+      deserialize("../../../Servable/DlibServable/test/assets/mnist_network.dat") >> raw_args.net;
+      file_args.filename = "../../../Servable/DlibServable/test/assets/mnist_network.dat";
     }
 
     Serving::DlibRawBindArgs<net_type> raw_args;
@@ -88,6 +89,13 @@ namespace {
         servable(4);
 
     EXPECT_NO_THROW(servable.Bind(raw_args));
+  }
+
+  TEST_F(TestDlibServable, BindFile) {
+    Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
+            servable(4);
+
+    EXPECT_NO_THROW(servable.Bind(file_args));
   }
 
 } // namespace

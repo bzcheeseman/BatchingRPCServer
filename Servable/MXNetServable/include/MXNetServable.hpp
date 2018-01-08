@@ -26,6 +26,9 @@
 // STL
 #include <map>
 #include <thread>
+#include <mutex>
+#include <atomic>
+#include <condition_variable>
 
 // MXNet
 #include "mxnet-cpp/MxNetCpp.h"

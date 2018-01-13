@@ -87,7 +87,7 @@ namespace Serving {
     // Information for processing
     std::mutex input_mutex_;
     std::map<std::string, std::pair<mx_uint, mx_uint>> idx_by_client_;
-    std::vector<mx::NDArray> current_batch_;
+    std::vector<mx::NDArray> current_batch_; // TODO: 2 current_batches so we can have a daemon thread running processing?
 
     mx_uint current_n_;
 

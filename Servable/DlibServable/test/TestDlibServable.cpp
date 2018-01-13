@@ -45,6 +45,16 @@ namespace {
                                        6, 5, 5, 1, 1,
                                        input<matrix<unsigned char>>>>>>>>>>>>>>;
 
+  Serving::TensorMessage ToMessage(std::vector<matrix<unsigned char>> arr) {
+
+    Serving::TensorMessage message;
+    std::stringstream buffer_stream;
+    serialize(arr, buffer_stream);
+    message.set_serialized_buffer(buffer_stream.str());
+
+    return message;
+  }
+
   void TrainNetwork(const std::string &dirname) {
     std::vector<matrix<unsigned char>> training_images;
     std::vector<unsigned long> training_labels;
@@ -78,10 +88,20 @@ namespace {
       TrainNetwork("../../../Servable/DlibServable/test/assets");
       deserialize("../../../Servable/DlibServable/test/assets/mnist_network.dat") >> raw_args.net;
       file_args.filename = "../../../Servable/DlibServable/test/assets/mnist_network.dat";
+
+      std::vector<matrix<unsigned char>> training_images;
+      std::vector<unsigned long> training_labels;
+      load_mnist_dataset(
+              "../../../Servable/DlibServable/test/assets", training_images, training_labels, input,
+              output_);
+
     }
 
     Serving::DlibRawBindArgs<net_type> raw_args;
     Serving::DlibFileBindArgs file_args;
+
+    std::vector<matrix<unsigned char>> input;
+    std::vector<unsigned long> output_;
   };
 
   TEST_F(TestDlibServable, Bind) {
@@ -96,6 +116,27 @@ namespace {
             servable(4);
 
     EXPECT_NO_THROW(servable.Bind(file_args));
+  }
+
+  TEST_F(TestDlibServable, Single) {
+    Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long> servable(4);
+
+    servable.Bind(raw_args);
+
+    Serving::TensorMessage msg = ToMessage(std::vector<matrix<unsigned char>>(input.begin(), input.begin()+4));
+    msg.set_client_id("test");
+
+    Serving::ReturnCodes r = servable.AddToBatch(msg);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
+
+    Serving::TensorMessage output;
+    r = servable.GetResult("test", &output);
+    EXPECT_EQ(r, Serving::ReturnCodes::OK);
+
+//    int buflen = msg.buffer().size();
+//    for (int i = 0; i < buflen; i++) {
+//      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
+//    }
   }
 
 } // namespace

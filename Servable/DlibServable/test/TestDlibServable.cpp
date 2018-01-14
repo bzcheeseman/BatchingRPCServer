@@ -21,6 +21,7 @@
  */
 
 #include <dlib/data_io.h>
+#include <sstream>
 
 #include "BatchingRPC.pb.h"
 #include "DlibServable.hpp"
@@ -45,12 +46,13 @@ namespace {
                                        6, 5, 5, 1, 1,
                                        input<matrix<unsigned char>>>>>>>>>>>>>>;
 
-  Serving::TensorMessage ToMessage(std::vector<matrix<unsigned char>> arr) {
+  Serving::TensorMessage ToMessage(std::vector<matrix<unsigned char>> &&arr) {
 
     Serving::TensorMessage message;
-    std::stringstream buffer_stream;
+    std::ostringstream buffer_stream (std::ios::binary);
     serialize(arr, buffer_stream);
     message.set_serialized_buffer(buffer_stream.str());
+    message.set_n(arr.size());
 
     return message;
   }
@@ -92,15 +94,17 @@ namespace {
       std::vector<matrix<unsigned char>> training_images;
       std::vector<unsigned long> training_labels;
       load_mnist_dataset(
-              "../../../Servable/DlibServable/test/assets", training_images, training_labels, input,
+              "../../../Servable/DlibServable/test/assets", training_images, training_labels, input_,
               output_);
+
+      std::cout << input_[0] << std::endl;
 
     }
 
     Serving::DlibRawBindArgs<net_type> raw_args;
     Serving::DlibFileBindArgs file_args;
 
-    std::vector<matrix<unsigned char>> input;
+    std::vector<matrix<unsigned char>> input_;
     std::vector<unsigned long> output_;
   };
 
@@ -119,11 +123,11 @@ namespace {
   }
 
   TEST_F(TestDlibServable, Single) {
-    Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long> servable(4);
+    Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long> servable(1);
 
     servable.Bind(raw_args);
 
-    Serving::TensorMessage msg = ToMessage(std::vector<matrix<unsigned char>>(input.begin(), input.begin()+4));
+    Serving::TensorMessage msg = ToMessage({input_[0]});
     msg.set_client_id("test");
 
     Serving::ReturnCodes r = servable.AddToBatch(msg);
@@ -132,11 +136,12 @@ namespace {
     Serving::TensorMessage output;
     r = servable.GetResult("test", &output);
     EXPECT_EQ(r, Serving::ReturnCodes::OK);
+    std::istringstream output_buffer (output.serialized_buffer(), std::ios::binary);
 
-//    int buflen = msg.buffer().size();
-//    for (int i = 0; i < buflen; i++) {
-//      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
-//    }
+    std::vector<unsigned long> results;
+    deserialize(results, output_buffer);
+    EXPECT_EQ(results[0], 7);
+    // this particular image is a seven, since the net is trained we might as well run a prediction
   }
 
 } // namespace

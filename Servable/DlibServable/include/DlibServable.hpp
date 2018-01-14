@@ -127,8 +127,8 @@ namespace Serving {
   ReturnCodes DlibServable<NetType, InputType, OutputType>::AddToBatch(
       const TensorMessage &message) {
     const std::string &client_id = message.client_id();
-    std::vector<InputType> input(message.n());
-    std::stringstream message_stream(message.serialized_buffer(), std::ios::binary);
+    std::vector<InputType> message_input(message.n());
+    std::istringstream message_stream(message.serialized_buffer(), std::ios::binary);
 
     if (!bind_called_) {
       return ReturnCodes::NEED_BIND_CALL;
@@ -138,10 +138,10 @@ namespace Serving {
       return ReturnCodes::BATCH_TOO_LARGE;
     }
 
-    // error deserializing object of type unsigned long while deserializing object of type std::vector
-    dlib::deserialize(input, message_stream);
+    // error deserializing object of type unsigned long while deserializing object of type std::vector(?)
+    dlib::deserialize(message_input, message_stream);
 
-    if (input.size() != message.n()) {
+    if (message_input.size() != message.n()) {
       return ReturnCodes::SHAPE_INCORRECT;
     }
 
@@ -165,7 +165,7 @@ namespace Serving {
       }
 
       // Clients could send us multiple inputs, we need to deal with that properly.
-      current_batch_.insert(current_batch_.end(), input.begin(), input.end());
+      current_batch_.insert(current_batch_.end(), message_input.begin(), message_input.end());
 
       current_n_ += message.n();
       if (current_n_ <= batch_size_) {

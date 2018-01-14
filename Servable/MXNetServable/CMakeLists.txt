@@ -22,6 +22,7 @@ add_library(MXNetServable SHARED
 target_link_libraries(MXNetServable
         PUBLIC ${MXNET_LIBS}
         PUBLIC ${PROTOBUF_LIBRARIES}
+        PUBLIC c++
 )
 target_include_directories(MXNetServable
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include

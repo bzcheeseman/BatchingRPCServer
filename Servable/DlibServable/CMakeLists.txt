@@ -20,7 +20,9 @@ add_library(DlibServable SHARED
         ${ProtoSources} ${ProtoHeaders}
         )
 target_link_libraries(DlibServable
-        PUBLIC dlib::dlib ${PROTOBUF_LIBRARIES}
+        PUBLIC dlib::dlib
+        PUBLIC ${PROTOBUF_LIBRARIES}
+        PUBLIC c++
         )
 target_include_directories(DlibServable
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include

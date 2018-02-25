@@ -31,389 +31,389 @@
 #include "gtest/gtest.h"
 
 namespace {
-  namespace mx = mxnet::cpp;
+namespace mx = mxnet::cpp;
 
-  mx::Symbol SimpleSymbolFactory(int n_hidden) {
-    mx::Symbol data = mx::Symbol::Variable("data");
-    mx::Symbol m = mx::Symbol::Variable("m");
-    mx::Symbol b = mx::Symbol::Variable("b");
+mx::Symbol SimpleSymbolFactory(int n_hidden) {
+  mx::Symbol data = mx::Symbol::Variable("data");
+  mx::Symbol m = mx::Symbol::Variable("m");
+  mx::Symbol b = mx::Symbol::Variable("b");
 
-    mx::Symbol result = mx::FullyConnected("fc1", data, m, b, n_hidden);
+  mx::Symbol result = mx::FullyConnected("fc1", data, m, b, n_hidden);
 
-    return result;
+  return result;
+}
+
+Serving::TensorMessage ToMessage(mx::NDArray &arr) {
+  std::vector<mx_uint> result_shape = arr.GetShape();
+
+  Serving::TensorMessage message;
+  google::protobuf::RepeatedField<float> data(arr.GetData(),
+                                              arr.GetData() + arr.Size());
+  message.mutable_buffer()->Swap(&data);
+
+  message.set_n(result_shape[0]);
+  message.set_k(result_shape[1]);
+  message.set_nr(result_shape[2]);
+  message.set_nc(result_shape[3]);
+  message.set_client_id("data");
+
+  return message;
+}
+
+void ThreadedAdd(Serving::Servable *servable, Serving::TensorMessage msg) {
+  Serving::ReturnCodes r1 = servable->AddToBatch(msg);
+  EXPECT_EQ(r1, Serving::ReturnCodes::OK);
+}
+
+class TestMXNetServable : public ::testing::Test {
+
+protected:
+  void SetUp() override {
+
+    ctx = new mx::Context(mx::kCPU, 0);
+
+    fc = SimpleSymbolFactory(n_hidden);
+
+    mx::NDArray m(mx::Shape(n_hidden, n_hidden), *ctx);
+    m = 2.f;
+    parms["arg:m"] = m;
+    mx::NDArray b(mx::Shape(n_hidden), *ctx);
+    b = 1.f;
+    parms["arg:b"] = b;
+
+    input = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
+    input = 1.f;
+
+    zeros = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
+    zeros = 0.f;
+
+    wrong_size = mx::NDArray(mx::Shape(1, 1, 1, n_hidden + 1), *ctx);
+    wrong_size = 1.f;
+
+    too_big = mx::NDArray(mx::Shape(2, 1, 1, n_hidden), *ctx);
+    too_big = 1.f;
+
+    raw_args.net = fc;
+    raw_args.parameters = parms;
+
+    file_args.symbol_filename = "../../../Servable/MXNetServable/test/assets/"
+                                "squeezenet_v1.1-symbol.json";
+    file_args.parameters_filename = "../../../Servable/MXNetServable/test/"
+                                    "assets/squeezenet_v1.1-0000.params";
   }
 
-  Serving::TensorMessage ToMessage(mx::NDArray &arr) {
-    std::vector<mx_uint> result_shape = arr.GetShape();
+  void TearDown() override { delete ctx; }
 
-    Serving::TensorMessage message;
-    google::protobuf::RepeatedField<float> data(
-        arr.GetData(), arr.GetData() + arr.Size());
-    message.mutable_buffer()->Swap(&data);
+  mx::Context *ctx;
+  int n_hidden = 2000;
+  mx::Symbol fc;
+  std::map<std::string, mx::NDArray> parms;
+  mx::NDArray input;
+  mx::NDArray zeros;
+  mx::NDArray wrong_size;
+  mx::NDArray too_big;
 
-    message.set_n(result_shape[0]);
-    message.set_k(result_shape[1]);
-    message.set_nr(result_shape[2]);
-    message.set_nc(result_shape[3]);
-    message.set_client_id("data");
+  Serving::RawBindArgs raw_args;
+  Serving::FileBindArgs file_args;
+};
 
-    return message;
+TEST_F(TestMXNetServable, Bind) {
+  Serving::MXNetServable servable(mx::Shape(1, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
+
+  EXPECT_NO_THROW(servable.Bind(raw_args));
+}
+
+TEST_F(TestMXNetServable, BindFile) {
+  Serving::MXNetServable servable(mx::Shape(16, 3, 256, 256),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
+
+  EXPECT_NO_THROW(servable.Bind(file_args));
+}
+
+TEST_F(TestMXNetServable, Single) {
+  Serving::MXNetServable servable(mx::Shape(1, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
+
+  servable.Bind(raw_args);
+
+  Serving::TensorMessage msg = ToMessage(input);
+  msg.set_client_id("test");
+
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+
+  Serving::TensorMessage output;
+  r = servable.GetResult("test", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+
+  int buflen = msg.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
   }
+}
 
-  void ThreadedAdd(Serving::Servable *servable, Serving::TensorMessage msg) {
-    Serving::ReturnCodes r1 = servable->AddToBatch(msg);
-    EXPECT_EQ(r1, Serving::ReturnCodes::OK);
+TEST_F(TestMXNetServable, NoBind) {
+  Serving::MXNetServable servable(mx::Shape(1, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
+
+  Serving::TensorMessage msg = ToMessage(input);
+  msg.set_client_id("no_bind");
+
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::NEED_BIND_CALL);
+}
+
+TEST_F(TestMXNetServable, BadShape) {
+  Serving::MXNetServable servable(mx::Shape(1, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
+
+  servable.Bind(raw_args);
+
+  Serving::TensorMessage msg = ToMessage(wrong_size);
+  msg.set_client_id("incorrect_shape");
+
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::SHAPE_INCORRECT);
+}
+
+TEST_F(TestMXNetServable, TooBig) {
+  Serving::MXNetServable servable(mx::Shape(1, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
+
+  servable.Bind(raw_args);
+
+  Serving::TensorMessage msg = ToMessage(too_big);
+  msg.set_client_id("too_big");
+
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::BATCH_TOO_LARGE);
+}
+
+TEST_F(TestMXNetServable, NextBatch) {
+  Serving::MXNetServable servable(mx::Shape(3, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
+
+  servable.Bind(raw_args);
+
+  Serving::TensorMessage msg = ToMessage(too_big);
+  msg.set_client_id("too_big");
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+
+  msg = ToMessage(too_big);
+  msg.set_client_id("too_big");
+
+  r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::NEXT_BATCH);
+}
+
+TEST_F(TestMXNetServable, Multiple) {
+  Serving::MXNetServable servable(mx::Shape(2, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
+
+  servable.Bind(raw_args);
+
+  Serving::TensorMessage msg = ToMessage(input);
+  msg.set_client_id("test");
+
+  std::thread t1(ThreadedAdd, &servable, msg);
+  t1.detach();
+  std::thread t2(ThreadedAdd, &servable, msg);
+  t2.detach();
+
+  Serving::TensorMessage output;
+  Serving::ReturnCodes r = servable.GetResult(
+      "test", &output); // this isn't blocking so everything gets destroyed?
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+
+  EXPECT_EQ(output.n(), 2);
+
+  int buflen = msg.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
   }
+}
 
-  class TestMXNetServable : public ::testing::Test {
+TEST_F(TestMXNetServable, MultipleClients) {
+  Serving::MXNetServable servable(mx::Shape(3, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
 
-  protected:
-    void SetUp() override {
+  servable.Bind(raw_args);
 
-      ctx = new mx::Context(mx::kCPU, 0);
+  Serving::TensorMessage msg = ToMessage(input);
+  msg.set_client_id("test");
+  Serving::TensorMessage z = ToMessage(zeros);
+  z.set_client_id("zeros");
 
-      fc = SimpleSymbolFactory(n_hidden);
+  std::thread t1(ThreadedAdd, &servable, msg);
+  t1.detach();
+  std::thread t2(ThreadedAdd, &servable, msg);
+  t2.detach();
+  std::thread tz(ThreadedAdd, &servable, z);
+  tz.detach();
 
-      mx::NDArray m(mx::Shape(n_hidden, n_hidden), *ctx);
-      m = 2.f;
-      parms["arg:m"] = m;
-      mx::NDArray b(mx::Shape(n_hidden), *ctx);
-      b = 1.f;
-      parms["arg:b"] = b;
+  Serving::TensorMessage output;
+  int buflen;
+  Serving::ReturnCodes r;
 
-      input = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
-      input = 1.f;
-
-      zeros = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
-      zeros = 0.f;
-
-      wrong_size = mx::NDArray(mx::Shape(1, 1, 1, n_hidden + 1), *ctx);
-      wrong_size = 1.f;
-
-      too_big = mx::NDArray(mx::Shape(2, 1, 1, n_hidden), *ctx);
-      too_big = 1.f;
-
-      raw_args.net = fc;
-      raw_args.parameters = parms;
-
-      file_args.symbol_filename = "../../../Servable/MXNetServable/test/assets/"
-                                  "squeezenet_v1.1-symbol.json";
-      file_args.parameters_filename = "../../../Servable/MXNetServable/test/"
-                                      "assets/squeezenet_v1.1-0000.params";
-    }
-
-    void TearDown() override { delete ctx; }
-
-    mx::Context *ctx;
-    int n_hidden = 2000;
-    mx::Symbol fc;
-    std::map<std::string, mx::NDArray> parms;
-    mx::NDArray input;
-    mx::NDArray zeros;
-    mx::NDArray wrong_size;
-    mx::NDArray too_big;
-
-    Serving::RawBindArgs raw_args;
-    Serving::FileBindArgs file_args;
-  };
-
-  TEST_F(TestMXNetServable, Bind) {
-    Serving::MXNetServable servable(
-        mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
-
-    EXPECT_NO_THROW(servable.Bind(raw_args));
+  r = servable.GetResult("test", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 2);
+  buflen = msg.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
   }
+  output.clear_buffer();
 
-  TEST_F(TestMXNetServable, BindFile) {
-    Serving::MXNetServable servable(
-        mx::Shape(16, 3, 256, 256), mx::Shape(1, n_hidden), mx::kCPU, 0);
-
-    EXPECT_NO_THROW(servable.Bind(file_args));
+  r = servable.GetResult("zeros", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 1);
+  buflen = msg.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 1.f);
   }
+}
 
-  TEST_F(TestMXNetServable, Single) {
-    Serving::MXNetServable servable(
-        mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
+TEST_F(TestMXNetServable, UpdateBatchSuccess) {
+  Serving::MXNetServable servable(mx::Shape(2, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(raw_args);
+  servable.Bind(raw_args);
 
-    Serving::TensorMessage msg = ToMessage(input);
-    msg.set_client_id("test");
+  Serving::TensorMessage msg = ToMessage(input);
+  msg.set_client_id("test");
+  Serving::TensorMessage z = ToMessage(zeros);
+  z.set_client_id("zeros");
 
-    Serving::ReturnCodes r = servable.AddToBatch(msg);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  std::thread t1(ThreadedAdd, &servable, msg);
 
-    Serving::TensorMessage output;
-    r = servable.GetResult("test", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  Serving::ReturnCodes r2 = servable.SetBatchSize(3);
+  EXPECT_EQ(r2, Serving::ReturnCodes::OK);
 
-    int buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
-    }
+  std::thread t2(ThreadedAdd, &servable, msg);
+  std::thread tz(ThreadedAdd, &servable, z);
+
+  Serving::TensorMessage output;
+  int buflen;
+  Serving::ReturnCodes r;
+
+  tz.join();
+  r = servable.GetResult("zeros", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 1);
+  buflen = msg.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 1.f);
   }
+  output.clear_buffer();
 
-  TEST_F(TestMXNetServable, NoBind) {
-    Serving::MXNetServable servable(
-        mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
-
-    Serving::TensorMessage msg = ToMessage(input);
-    msg.set_client_id("no_bind");
-
-    Serving::ReturnCodes r = servable.AddToBatch(msg);
-    EXPECT_EQ(r, Serving::ReturnCodes::NEED_BIND_CALL);
+  t1.join();
+  t2.join();
+  r = servable.GetResult("test", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 2);
+  buflen = msg.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
   }
+}
 
-  TEST_F(TestMXNetServable, BadShape) {
-    Serving::MXNetServable servable(
-        mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
+TEST_F(TestMXNetServable, UpdateBatchFail) {
+  Serving::MXNetServable servable(mx::Shape(3, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 1);
 
-    servable.Bind(raw_args);
+  servable.Bind(raw_args);
 
-    Serving::TensorMessage msg = ToMessage(wrong_size);
-    msg.set_client_id("incorrect_shape");
+  Serving::TensorMessage msg = ToMessage(input);
+  msg.set_client_id("test");
+  Serving::TensorMessage z = ToMessage(zeros);
+  z.set_client_id("zeros");
 
-    Serving::ReturnCodes r = servable.AddToBatch(msg);
-    EXPECT_EQ(r, Serving::ReturnCodes::SHAPE_INCORRECT);
+  std::thread t1(ThreadedAdd, &servable, msg);
+  t1.detach();
+  std::thread t2(ThreadedAdd, &servable, msg);
+  t2.detach();
+  // Add must have occurred for the batch size modification to fail
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+  Serving::ReturnCodes r3 = servable.SetBatchSize(1);
+  EXPECT_EQ(r3, Serving::ReturnCodes::NEXT_BATCH);
+
+  std::thread tz(ThreadedAdd, &servable, z);
+  tz.detach();
+
+  Serving::TensorMessage output;
+  int buflen;
+  Serving::ReturnCodes r;
+
+  r = servable.GetResult("test", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 2);
+  buflen = msg.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
   }
+  output.clear_buffer();
 
-  TEST_F(TestMXNetServable, TooBig) {
-    Serving::MXNetServable servable(
-        mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
-
-    servable.Bind(raw_args);
-
-    Serving::TensorMessage msg = ToMessage(too_big);
-    msg.set_client_id("too_big");
-
-    Serving::ReturnCodes r = servable.AddToBatch(msg);
-    EXPECT_EQ(r, Serving::ReturnCodes::BATCH_TOO_LARGE);
+  r = servable.GetResult("zeros", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 1);
+  buflen = msg.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 1.f);
   }
+}
 
-  TEST_F(TestMXNetServable, NextBatch) {
-    Serving::MXNetServable servable(
-        mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
+TEST_F(TestMXNetServable, MultipleBatches) {
+  Serving::MXNetServable servable(mx::Shape(1, 1, 1, n_hidden),
+                                  mx::Shape(1, n_hidden), mx::kCPU, 0);
 
-    servable.Bind(raw_args);
+  servable.Bind(raw_args);
 
-    Serving::TensorMessage msg = ToMessage(too_big);
-    msg.set_client_id("too_big");
-    Serving::ReturnCodes r = servable.AddToBatch(msg);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  Serving::TensorMessage msg1 = ToMessage(input);
+  msg1.set_client_id("test1");
+  Serving::TensorMessage msg2 = ToMessage(input);
+  msg2.set_client_id("test2");
+  Serving::TensorMessage z = ToMessage(zeros);
+  z.set_client_id("zeros");
 
-    msg = ToMessage(too_big);
-    msg.set_client_id("too_big");
+  std::thread t1(ThreadedAdd, &servable, msg1);
+  t1.detach();
+  std::thread t2(ThreadedAdd, &servable, msg2);
+  t2.detach();
+  std::thread tz(ThreadedAdd, &servable, z);
+  tz.detach();
 
-    r = servable.AddToBatch(msg);
-    EXPECT_EQ(r, Serving::ReturnCodes::NEXT_BATCH);
+  Serving::TensorMessage output;
+  int buflen;
+  Serving::ReturnCodes r;
+
+  r = servable.GetResult("test1", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 1);
+  buflen = msg1.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
   }
+  output.clear_buffer();
 
-  TEST_F(TestMXNetServable, Multiple) {
-    Serving::MXNetServable servable(
-        mx::Shape(2, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
-
-    servable.Bind(raw_args);
-
-    Serving::TensorMessage msg = ToMessage(input);
-    msg.set_client_id("test");
-
-    std::thread t1(ThreadedAdd, &servable, msg);
-    t1.detach();
-    std::thread t2(ThreadedAdd, &servable, msg);
-    t2.detach();
-
-    Serving::TensorMessage output;
-    Serving::ReturnCodes r = servable.GetResult(
-        "test", &output); // this isn't blocking so everything gets destroyed?
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-
-    EXPECT_EQ(output.n(), 2);
-
-    int buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
-    }
+  r = servable.GetResult("test2", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 1);
+  buflen = msg2.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
   }
+  output.clear_buffer();
 
-  TEST_F(TestMXNetServable, MultipleClients) {
-    Serving::MXNetServable servable(
-        mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
-
-    servable.Bind(raw_args);
-
-    Serving::TensorMessage msg = ToMessage(input);
-    msg.set_client_id("test");
-    Serving::TensorMessage z = ToMessage(zeros);
-    z.set_client_id("zeros");
-
-    std::thread t1(ThreadedAdd, &servable, msg);
-    t1.detach();
-    std::thread t2(ThreadedAdd, &servable, msg);
-    t2.detach();
-    std::thread tz(ThreadedAdd, &servable, z);
-    tz.detach();
-
-    Serving::TensorMessage output;
-    int buflen;
-    Serving::ReturnCodes r;
-
-    r = servable.GetResult("test", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 2);
-    buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
-    }
-    output.clear_buffer();
-
-    r = servable.GetResult("zeros", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 1);
-    buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 1.f);
-    }
+  r = servable.GetResult("zeros", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  EXPECT_EQ(output.n(), 1);
+  buflen = z.buffer().size();
+  for (int i = 0; i < buflen; i++) {
+    EXPECT_EQ(output.buffer(i), 1.f);
   }
-
-  TEST_F(TestMXNetServable, UpdateBatchSuccess) {
-    Serving::MXNetServable servable(
-        mx::Shape(2, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
-
-    servable.Bind(raw_args);
-
-    Serving::TensorMessage msg = ToMessage(input);
-    msg.set_client_id("test");
-    Serving::TensorMessage z = ToMessage(zeros);
-    z.set_client_id("zeros");
-
-    std::thread t1(ThreadedAdd, &servable, msg);
-
-    Serving::ReturnCodes r2 = servable.SetBatchSize(3);
-    EXPECT_EQ(r2, Serving::ReturnCodes::OK);
-
-    std::thread t2(ThreadedAdd, &servable, msg);
-    std::thread tz(ThreadedAdd, &servable, z);
-
-    Serving::TensorMessage output;
-    int buflen;
-    Serving::ReturnCodes r;
-
-    tz.join();
-    r = servable.GetResult("zeros", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 1);
-    buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 1.f);
-    }
-    output.clear_buffer();
-
-    t1.join();
-    t2.join();
-    r = servable.GetResult("test", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 2);
-    buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
-    }
-  }
-
-  TEST_F(TestMXNetServable, UpdateBatchFail) {
-    Serving::MXNetServable servable(
-        mx::Shape(3, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
-
-    servable.Bind(raw_args);
-
-    Serving::TensorMessage msg = ToMessage(input);
-    msg.set_client_id("test");
-    Serving::TensorMessage z = ToMessage(zeros);
-    z.set_client_id("zeros");
-
-    std::thread t1(ThreadedAdd, &servable, msg);
-    t1.detach();
-    std::thread t2(ThreadedAdd, &servable, msg);
-    t2.detach();
-    // Add must have occurred for the batch size modification to fail
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
-    Serving::ReturnCodes r3 = servable.SetBatchSize(1);
-    EXPECT_EQ(r3, Serving::ReturnCodes::NEXT_BATCH);
-
-    std::thread tz(ThreadedAdd, &servable, z);
-    tz.detach();
-
-    Serving::TensorMessage output;
-    int buflen;
-    Serving::ReturnCodes r;
-
-    r = servable.GetResult("test", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 2);
-    buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
-    }
-    output.clear_buffer();
-
-    r = servable.GetResult("zeros", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 1);
-    buflen = msg.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 1.f);
-    }
-  }
-
-  TEST_F(TestMXNetServable, MultipleBatches) {
-    Serving::MXNetServable servable(
-        mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 0);
-
-    servable.Bind(raw_args);
-
-    Serving::TensorMessage msg1 = ToMessage(input);
-    msg1.set_client_id("test1");
-    Serving::TensorMessage msg2 = ToMessage(input);
-    msg2.set_client_id("test2");
-    Serving::TensorMessage z = ToMessage(zeros);
-    z.set_client_id("zeros");
-
-    std::thread t1(ThreadedAdd, &servable, msg1);
-    t1.detach();
-    std::thread t2(ThreadedAdd, &servable, msg2);
-    t2.detach();
-    std::thread tz(ThreadedAdd, &servable, z);
-    tz.detach();
-
-    Serving::TensorMessage output;
-    int buflen;
-    Serving::ReturnCodes r;
-
-    r = servable.GetResult("test1", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 1);
-    buflen = msg1.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
-    }
-    output.clear_buffer();
-
-    r = servable.GetResult("test2", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 1);
-    buflen = msg2.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 2.f * n_hidden + 1);
-    }
-    output.clear_buffer();
-
-    r = servable.GetResult("zeros", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    EXPECT_EQ(output.n(), 1);
-    buflen = z.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(output.buffer(i), 1.f);
-    }
-  }
+}
 } // namespace

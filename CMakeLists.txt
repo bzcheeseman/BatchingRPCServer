@@ -25,7 +25,7 @@ function(add_integration suffix)
         message(SEND_ERROR "Error: No Libraries to link to!")
         return()
     endif()
-    add_executable(TestIntegration${suffix} EXCLUDE_FROM_ALL ${CMAKE_CURRENT_SOURCE_DIR}/test/TestIntegrationMXNet.cpp)
+    add_executable(TestIntegration${suffix} EXCLUDE_FROM_ALL ${CMAKE_CURRENT_SOURCE_DIR}/test/TestIntegration${suffix}.cpp)
     target_link_libraries(TestIntegration${suffix} gtest_main)
     foreach(LIB ${ARGN})
         find_library(LIB
@@ -60,6 +60,7 @@ target_link_libraries(BatchingRPCServer PUBLIC ${LIBS})
 target_include_directories(BatchingRPCServer PUBLIC ${INCLUDE_DIRS})
 
 add_integration(MXNet BatchingRPCServer)
+add_integration(Dlib BatchingRPCServer)
 
 # Add cmake target so we can also call make doc to create the documentation
 add_custom_target(doc
@@ -69,9 +70,8 @@ add_custom_target(doc
 
 file(GLOB_RECURSE
         ALL_CXX_SOURCE_FILES
-        Servable/*.[chi]pp Servable/*.[chi]xx Servable/*.cc Servable/*.hh Servable/*.ii Servable/*.[CHI]
-        Server/*.[chi]pp Server/*.[chi]xx Server/*.cc Server/*.hh Server/*.ii Server/*.[CHI]
-        test/*.[chi]pp test/*.[chi]xx test/*.cc test/*.hh test/*.ii test/*.[CHI]
+        Server/**/*.[CHI] Server/**/*.[chi] Server/**/*.[chi]pp Server/**/*.[CHI]PP
+        Servable/**/*.[CHI] Servable/**/*.[chi] Servable/**/*.[chi]pp Servable/**/*.[CHI]PP
 )
 
 find_program(CLANG_FORMAT "clang-format")

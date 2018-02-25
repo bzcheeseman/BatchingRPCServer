@@ -30,118 +30,184 @@
 
 namespace {
 
-  using namespace dlib;
+using namespace dlib;
 
-  using net_type = loss_multiclass_log<fc<
-      10,
-      relu<fc<
-          84, relu<fc<
-                  120, max_pool<
-                           2, 2, 2, 2,
-                           relu<con<
-                               16, 5, 5, 1, 1,
-                               max_pool<
-                                   2, 2, 2, 2,
-                                   relu<con<
-                                       6, 5, 5, 1, 1,
-                                       input<matrix<unsigned char>>>>>>>>>>>>>>;
+using net_type = loss_multiclass_log<fc<
+    10,
+    relu<fc<
+        84,
+        relu<fc<
+            120,
+            max_pool<2, 2, 2, 2,
+                     relu<con<16, 5, 5, 1, 1,
+                              max_pool<2, 2, 2, 2,
+                                       relu<con<6, 5, 5, 1, 1,
+                                                input<matrix<
+                                                    unsigned char>>>>>>>>>>>>>>;
 
-  Serving::TensorMessage ToMessage(std::vector<matrix<unsigned char>> &&arr) {
+Serving::TensorMessage ToMessage(std::vector<matrix<unsigned char>> &&arr) {
 
-    Serving::TensorMessage message;
-    std::ostringstream buffer_stream (std::ios::binary);
-    serialize(arr, buffer_stream);
-    message.set_serialized_buffer(buffer_stream.str());
-    message.set_n(arr.size());
+  Serving::TensorMessage message;
+  std::ostringstream buffer_stream(std::ios::binary);
+  serialize(arr, buffer_stream);
+  message.set_serialized_buffer(buffer_stream.str());
+  message.set_n(arr.size());
 
-    return message;
+  return message;
+}
+
+void TrainNetwork(const std::string &dirname) {
+  std::vector<matrix<unsigned char>> training_images;
+  std::vector<unsigned long> training_labels;
+  std::vector<matrix<unsigned char>> testing_images;
+  std::vector<unsigned long> testing_labels;
+  load_mnist_dataset(dirname, training_images, training_labels, testing_images,
+                     testing_labels);
+
+  std::ifstream f(
+      "../../../Servable/DlibServable/test/assets/mnist_network.dat");
+  if (f.is_open()) {
+    f.close();
+    return;
   }
 
-  void TrainNetwork(const std::string &dirname) {
+  net_type net;
+  dnn_trainer<net_type> trainer(net);
+  trainer.set_learning_rate(0.01);
+  trainer.set_min_learning_rate(0.0001);
+  trainer.set_mini_batch_size(128);
+  trainer.be_verbose();
+  trainer.set_synchronization_file("mnist_sync", std::chrono::seconds(20));
+  trainer.train(training_images, training_labels);
+  net.clean();
+  serialize("../../../Servable/DlibServable/test/assets/mnist_network.dat")
+      << net;
+}
+
+class TestDlibServable : public ::testing::Test {
+protected:
+  void SetUp() override {
+    TrainNetwork("../../../Servable/DlibServable/test/assets");
+    deserialize(
+        "../../../Servable/DlibServable/test/assets/mnist_network.dat") >>
+        raw_args.net;
+    file_args.filename =
+        "../../../Servable/DlibServable/test/assets/mnist_network.dat";
+
     std::vector<matrix<unsigned char>> training_images;
     std::vector<unsigned long> training_labels;
-    std::vector<matrix<unsigned char>> testing_images;
-    std::vector<unsigned long> testing_labels;
-    load_mnist_dataset(
-        dirname, training_images, training_labels, testing_images,
-        testing_labels);
-
-    std::ifstream f("../../../Servable/DlibServable/test/assets/mnist_network.dat");
-    if (f.is_open()) {
-      f.close();
-      return;
-    }
-
-    net_type net;
-    dnn_trainer<net_type> trainer(net);
-    trainer.set_learning_rate(0.01);
-    trainer.set_min_learning_rate(0.0001);
-    trainer.set_mini_batch_size(128);
-    trainer.be_verbose();
-    trainer.set_synchronization_file("mnist_sync", std::chrono::seconds(20));
-    trainer.train(training_images, training_labels);
-    net.clean();
-    serialize("../../../Servable/DlibServable/test/assets/mnist_network.dat") << net;
+    load_mnist_dataset("../../../Servable/DlibServable/test/assets",
+                       training_images, training_labels, input_, output_);
   }
 
-  class TestDlibServable : public ::testing::Test {
-  protected:
-    void SetUp() override {
-      TrainNetwork("../../../Servable/DlibServable/test/assets");
-      deserialize("../../../Servable/DlibServable/test/assets/mnist_network.dat") >> raw_args.net;
-      file_args.filename = "../../../Servable/DlibServable/test/assets/mnist_network.dat";
+  Serving::DlibRawBindArgs<net_type> raw_args;
+  Serving::DlibFileBindArgs file_args;
 
-      std::vector<matrix<unsigned char>> training_images;
-      std::vector<unsigned long> training_labels;
-      load_mnist_dataset(
-              "../../../Servable/DlibServable/test/assets", training_images, training_labels, input_,
-              output_);
+  std::vector<matrix<unsigned char>> input_;
+  std::vector<unsigned long> output_;
+};
 
-      std::cout << input_[0] << std::endl;
+TEST_F(TestDlibServable, Bind) {
+  Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
+      servable(4);
 
-    }
+  EXPECT_NO_THROW(servable.Bind(raw_args));
+}
 
-    Serving::DlibRawBindArgs<net_type> raw_args;
-    Serving::DlibFileBindArgs file_args;
+TEST_F(TestDlibServable, BindFile) {
+  Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
+      servable(4);
 
-    std::vector<matrix<unsigned char>> input_;
-    std::vector<unsigned long> output_;
-  };
+  EXPECT_NO_THROW(servable.Bind(file_args));
+}
 
-  TEST_F(TestDlibServable, Bind) {
-    Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
-        servable(4);
+TEST_F(TestDlibServable, Single) {
+  Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
+      servable(1);
 
-    EXPECT_NO_THROW(servable.Bind(raw_args));
-  }
+  servable.Bind(raw_args);
 
-  TEST_F(TestDlibServable, BindFile) {
-    Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
-            servable(4);
+  Serving::TensorMessage msg = ToMessage({input_[0]});
+  msg.set_client_id("test");
 
-    EXPECT_NO_THROW(servable.Bind(file_args));
-  }
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
 
-  TEST_F(TestDlibServable, Single) {
-    Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long> servable(1);
+  Serving::TensorMessage output;
+  r = servable.GetResult("test", &output);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  std::istringstream output_buffer(output.serialized_buffer(),
+                                   std::ios::binary);
 
-    servable.Bind(raw_args);
+  std::vector<unsigned long> results;
+  deserialize(results, output_buffer);
+  // this particular image is a seven, since the net is trained we might as well
+  // run a prediction
+  EXPECT_EQ(results[0], 7);
+}
 
-    Serving::TensorMessage msg = ToMessage({input_[0]});
-    msg.set_client_id("test");
+TEST_F(TestDlibServable, NoBind) {
+  Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
+      servable(1);
 
-    Serving::ReturnCodes r = servable.AddToBatch(msg);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
+  Serving::TensorMessage msg = ToMessage({input_[0]});
+  msg.set_client_id("no_bind");
 
-    Serving::TensorMessage output;
-    r = servable.GetResult("test", &output);
-    EXPECT_EQ(r, Serving::ReturnCodes::OK);
-    std::istringstream output_buffer (output.serialized_buffer(), std::ios::binary);
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::NEED_BIND_CALL);
+}
 
-    std::vector<unsigned long> results;
-    deserialize(results, output_buffer);
-    EXPECT_EQ(results[0], 7);
-    // this particular image is a seven, since the net is trained we might as well run a prediction
-  }
+TEST_F(TestDlibServable, WrongSize) {
+  Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
+      servable(2);
+
+  servable.Bind(raw_args);
+
+  Serving::TensorMessage msg;
+  std::ostringstream buffer_stream(std::ios::binary);
+
+  std::vector<matrix<unsigned char>> arr;
+  arr.push_back(input_[0]);
+
+  serialize(arr, buffer_stream);
+  msg.set_serialized_buffer(buffer_stream.str());
+  msg.set_n(2);
+
+  msg.set_client_id("wrong_size");
+
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::SHAPE_INCORRECT);
+}
+
+TEST_F(TestDlibServable, TooBig) {
+  Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
+      servable(1);
+
+  servable.Bind(raw_args);
+
+  Serving::TensorMessage msg = ToMessage({input_[0], input_[1]});
+  msg.set_client_id("too_big");
+
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::BATCH_TOO_LARGE);
+}
+
+TEST_F(TestDlibServable, NextBatch) {
+  Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>
+      servable(3);
+
+  servable.Bind(raw_args);
+
+  Serving::TensorMessage msg = ToMessage({input_[0], input_[1]});
+  msg.set_client_id("too_big");
+  Serving::ReturnCodes r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::OK);
+
+  msg = ToMessage({input_[0], input_[1]});
+  msg.set_client_id("too_big");
+
+  r = servable.AddToBatch(msg);
+  EXPECT_EQ(r, Serving::ReturnCodes::NEXT_BATCH);
+}
 
 } // namespace

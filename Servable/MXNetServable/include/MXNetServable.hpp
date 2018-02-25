@@ -24,11 +24,11 @@
 #define BATCHING_RPC_SERVER_MXNETSERVABLE_HPP
 
 // STL
-#include <map>
-#include <thread>
-#include <mutex>
 #include <atomic>
 #include <condition_variable>
+#include <map>
+#include <mutex>
+#include <thread>
 
 // MXNet
 #include "mxnet-cpp/MxNetCpp.h"
@@ -41,69 +41,70 @@
 
 namespace Serving {
 
-  namespace mx = mxnet::cpp;
+namespace mx = mxnet::cpp;
 
-  struct RawBindArgs : public BindArgs {
-    mx::Symbol net;
-    std::map<std::string, mx::NDArray> parameters;
-  };
+struct RawBindArgs : public BindArgs {
+  mx::Symbol net;
+  std::map<std::string, mx::NDArray> parameters;
+};
 
-  struct FileBindArgs : public BindArgs {
-    std::string symbol_filename;
-    std::string parameters_filename;
-  };
+struct FileBindArgs : public BindArgs {
+  std::string symbol_filename;
+  std::string parameters_filename;
+};
 
-  class MXNetServable : public Servable {
-  public:
-    MXNetServable(
-        const mx::Shape &input_shape, const mx::Shape &output_shape,
-        const mx::DeviceType &type, const int &device_id);
+class MXNetServable : public Servable {
+public:
+  MXNetServable(const mx::Shape &input_shape, const mx::Shape &output_shape,
+                const mx::DeviceType &type, const int &device_id);
 
-    ~MXNetServable() override;
+  ~MXNetServable() override;
 
-    ReturnCodes SetBatchSize(const int &new_size) override;
+  ReturnCodes SetBatchSize(const int &new_size) override;
 
-    ReturnCodes AddToBatch(const TensorMessage &message) override;
+  ReturnCodes AddToBatch(const TensorMessage &message) override;
 
-    ReturnCodes
-    GetResult(const std::string &client_id, TensorMessage *message) override;
+  ReturnCodes GetResult(const std::string &client_id,
+                        TensorMessage *message) override;
 
-    ReturnCodes Bind(BindArgs &args) override;
+  ReturnCodes Bind(BindArgs &args) override;
 
-  private:
-    void SetBatchSize_(const int &new_size);
+private:
+  void SetBatchSize_(const int &new_size);
 
-    void BindExecutor_();
+  void BindExecutor_();
 
-    void LoadParameters_(std::map<std::string, mx::NDArray> &parameters);
+  void LoadParameters_(std::map<std::string, mx::NDArray> &parameters);
 
-    void ProcessCurrentBatch_();
+  void ProcessCurrentBatch_();
 
-    // Basic I/O requirements
-    std::atomic<bool> bind_called_;
-    mx::Shape input_shape_;
-    mx::Shape output_shape_;
+  // Basic I/O requirements
+  std::atomic<bool> bind_called_;
+  mx::Shape input_shape_;
+  mx::Shape output_shape_;
 
-    // Information for processing
-    std::mutex input_mutex_;
-    std::map<std::string, std::pair<mx_uint, mx_uint>> idx_by_client_;
-    std::vector<mx::NDArray> current_batch_; // TODO: 2 current_batches so we can have a daemon thread running processing?
+  // Information for processing
+  std::mutex input_mutex_;
+  std::map<std::string, std::pair<mx_uint, mx_uint>> idx_by_client_;
+  std::vector<mx::NDArray> current_batch_; // TODO: 2 current_batches so we can
+                                           // have a daemon thread running
+                                           // processing?
 
-    mx_uint current_n_;
+  mx_uint current_n_;
 
-    std::mutex result_mutex_;
-    std::condition_variable result_cv_;
-    std::set<std::string> done_processing_by_client_;
-    std::map<std::string, mx::NDArray> result_by_client_;
+  std::mutex result_mutex_;
+  std::condition_variable result_cv_;
+  std::set<std::string> done_processing_by_client_;
+  std::map<std::string, mx::NDArray> result_by_client_;
 
-    // MXNet requirements for running
-    mx::Context ctx_;
-    mx::Symbol servable_;
-    mx::Executor *executor_;
-    std::map<std::string, mx::NDArray>
-        args_map_; // inputs (data and model parameters) are args
-    std::map<std::string, mx::NDArray> aux_map_; // everyone else is aux
-  };
+  // MXNet requirements for running
+  mx::Context ctx_;
+  mx::Symbol servable_;
+  mx::Executor *executor_;
+  std::map<std::string, mx::NDArray>
+      args_map_; // inputs (data and model parameters) are args
+  std::map<std::string, mx::NDArray> aux_map_; // everyone else is aux
+};
 
 } // namespace Serving
 

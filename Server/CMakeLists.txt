@@ -23,6 +23,7 @@ add_library(TBServer SHARED
         ${GrpcSources} ${GrpcHeaders}
 )
 target_link_libraries(TBServer
+        PUBLIC c++
         PUBLIC gRPC::grpc
         PUBLIC gRPC::grpc++
         PUBLIC ${PROTOBUF_LIBRARIES}
@@ -30,8 +31,9 @@ target_link_libraries(TBServer
 )
 target_include_directories(TBServer
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_BINARY_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../Servable ${UUID_INCLUDE_DIRS}
+        PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../Servable
+        PUBLIC ${UUID_INCLUDE_DIRS}
 )
 
 add_gtest(TBServer TBServer)
@@ -41,4 +43,5 @@ set(SOURCES ${batching_server_src} ${batching_server_include} ${SOURCES} PARENT_
 # Add my specific libraries (not generated)
 set(LIBS ${UUID_LIBRARIES} ${LIBS} PARENT_SCOPE)
 # Add my specific include dirs (not generated)
-set(INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include ${UUID_INCLUDE_DIRS} ${INCLUDE_DIRS} PARENT_SCOPE)
+set(INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${UUID_INCLUDE_DIRS} ${INCLUDE_DIRS} PARENT_SCOPE)

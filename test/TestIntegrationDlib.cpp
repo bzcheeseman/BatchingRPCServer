@@ -20,7 +20,10 @@
     limitations under the License.
  */
 
-#include "MXNetServable.hpp"
+#include <dlib/data_io.h>
+#include <sstream>
+
+#include "DlibServable.hpp"
 #include "Servable.hpp"
 
 #include "TBServer.hpp"
@@ -35,33 +38,58 @@
 namespace Serving {
 namespace {
 
-namespace mx = mxnet::cpp;
+using namespace dlib;
 
-mx::Symbol SimpleSymbolFactory(int n_hidden) {
-  mx::Symbol data = mx::Symbol::Variable("data");
-  mx::Symbol m = mx::Symbol::Variable("m");
-  mx::Symbol b = mx::Symbol::Variable("b");
+using net_type = loss_multiclass_log<fc<
+    10,
+    relu<fc<
+        84,
+        relu<fc<
+            120,
+            max_pool<2, 2, 2, 2,
+                     relu<con<16, 5, 5, 1, 1,
+                              max_pool<2, 2, 2, 2,
+                                       relu<con<6, 5, 5, 1, 1,
+                                                input<matrix<
+                                                    unsigned char>>>>>>>>>>>>>>;
 
-  mx::Symbol result = mx::FullyConnected("fc1", data, m, b, n_hidden);
+Serving::TensorMessage ToMessage(std::vector<matrix<unsigned char>> &&arr) {
 
-  return result;
-}
-
-TensorMessage ToMessage(mx::NDArray &arr) {
-  std::vector<mx_uint> result_shape = arr.GetShape();
-
-  TensorMessage message;
-  google::protobuf::RepeatedField<float> data(arr.GetData(),
-                                              arr.GetData() + arr.Size());
-  message.mutable_buffer()->Swap(&data);
-
-  message.set_n(result_shape[0]);
-  message.set_k(result_shape[1]);
-  message.set_nr(result_shape[2]);
-  message.set_nc(result_shape[3]);
-  message.set_client_id("data");
+  Serving::TensorMessage message;
+  std::ostringstream buffer_stream(std::ios::binary);
+  serialize(arr, buffer_stream);
+  message.set_serialized_buffer(buffer_stream.str());
+  message.set_n(arr.size());
 
   return message;
+}
+
+void TrainNetwork(const std::string &dirname) {
+  std::vector<matrix<unsigned char>> training_images;
+  std::vector<unsigned long> training_labels;
+  std::vector<matrix<unsigned char>> testing_images;
+  std::vector<unsigned long> testing_labels;
+  load_mnist_dataset(dirname, training_images, training_labels, testing_images,
+                     testing_labels);
+
+  std::ifstream f(
+      "../Servable/DlibServable/test/assets/mnist_network.dat");
+  if (f.is_open()) {
+    f.close();
+    return;
+  }
+
+  net_type net;
+  dnn_trainer<net_type> trainer(net);
+  trainer.set_learning_rate(0.01);
+  trainer.set_min_learning_rate(0.0001);
+  trainer.set_mini_batch_size(128);
+  trainer.be_verbose();
+  trainer.set_synchronization_file("mnist_sync", std::chrono::seconds(20));
+  trainer.train(training_images, training_labels);
+  net.clean();
+  serialize("../Servable/DlibServable/test/assets/mnist_network.dat")
+      << net;
 }
 
 void ThreadProcess(std::unique_ptr<BatchingServer::Stub> &stub,
@@ -82,50 +110,41 @@ void ThreadProcess(std::unique_ptr<BatchingServer::Stub> &stub,
   }
 }
 
-class TestIntegrationMXNet : public ::testing::Test {
+class TestIntegrationDlib : public ::testing::Test {
 protected:
   void SetUp() override {
+    TrainNetwork("../Servable/DlibServable/test/assets");
+    deserialize(
+        "../Servable/DlibServable/test/assets/mnist_network.dat") >>
+        raw_args.net;
+    file_args.filename =
+        "../Servable/DlibServable/test/assets/mnist_network.dat";
 
-    ctx = new mx::Context(mx::kCPU, 0);
+    std::vector<matrix<unsigned char>> training_images;
+    std::vector<unsigned long> training_labels;
+    load_mnist_dataset("../Servable/DlibServable/test/assets",
+                       training_images, training_labels, input_, output_);
 
-    raw_args.net = SimpleSymbolFactory(n_hidden);
-
-    mx::NDArray m(mx::Shape(n_hidden, n_hidden), *ctx);
-    m = 2.f;
-    raw_args.parameters["arg:m"] = m;
-    mx::NDArray b(mx::Shape(n_hidden), *ctx);
-    b = 1.f;
-    raw_args.parameters["arg:b"] = b;
-
-    input = mx::NDArray(mx::Shape(1, 1, 1, n_hidden), *ctx);
-    input = 1.f;
-
-    MXNetServable *servable = new MXNetServable(
-        mx::Shape(1, 1, 1, n_hidden), mx::Shape(1, n_hidden), mx::kCPU, 1);
+    Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long> *servable =
+            new Serving::DlibServable<net_type, matrix<unsigned char>, unsigned long>(1);
     servable->Bind(raw_args);
-    srv = new TBServer(servable); // takes control of the servable
+    srv = new TBServer(servable);
+
     srv->StartInsecure("localhost:50051");
 
-    msg = ToMessage(input);
-  }
-
-  void TearDown() override {
-    srv->Stop();
-    delete srv;
+    msg = ToMessage({input_[0]});
   }
 
   Serving::TBServer *srv;
+  Serving::DlibRawBindArgs<net_type> raw_args;
+  Serving::DlibFileBindArgs file_args;
 
+  std::vector<matrix<unsigned char>> input_;
+  std::vector<unsigned long> output_;
   Serving::TensorMessage msg;
-
-  mx::Context *ctx;
-  int n_hidden = 2000;
-  mx::NDArray input;
-
-  Serving::RawBindArgs raw_args;
 };
 
-TEST_F(TestIntegrationMXNet, Connect) {
+TEST_F(TestIntegrationDlib, Connect) {
   std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials());
   std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
@@ -140,7 +159,7 @@ TEST_F(TestIntegrationMXNet, Connect) {
   EXPECT_FALSE(rep.client_id().empty());
 }
 
-TEST_F(TestIntegrationMXNet, SetBatchSize) {
+TEST_F(TestIntegrationDlib, SetBatchSize) {
   std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials());
   std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
@@ -156,7 +175,7 @@ TEST_F(TestIntegrationMXNet, SetBatchSize) {
   EXPECT_TRUE(status.ok());
 }
 
-TEST_F(TestIntegrationMXNet, Process) {
+TEST_F(TestIntegrationDlib, Process) {
   std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials());
   std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
@@ -180,14 +199,18 @@ TEST_F(TestIntegrationMXNet, Process) {
     status = stub->Process(&context, msg, &tensor_reply);
     EXPECT_TRUE(status.ok());
 
-    int buflen = tensor_reply.buffer().size();
-    for (int i = 0; i < buflen; i++) {
-      EXPECT_EQ(tensor_reply.buffer(i), 2.f * n_hidden + 1);
-    }
+    std::istringstream output_buffer(tensor_reply.serialized_buffer(),
+                                     std::ios::binary);
+
+    std::vector<unsigned long> results;
+    deserialize(results, output_buffer);
+    // this particular image is a seven, since the net is trained we might as well
+    // run a prediction
+    EXPECT_EQ(results[0], 7);
   }
 }
 
-TEST_F(TestIntegrationMXNet, ThreadedProcessSingle) {
+TEST_F(TestIntegrationDlib, ThreadedProcessSingle) {
   std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials());
   std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
@@ -198,13 +221,17 @@ TEST_F(TestIntegrationMXNet, ThreadedProcessSingle) {
                                 std::ref(tensor_reply));
 
   processing_thread.join();
-  int buflen = tensor_reply.buffer().size();
-  for (int i = 0; i < buflen; i++) {
-    EXPECT_EQ(tensor_reply.buffer(i), 2.f * n_hidden + 1);
-  }
+
+  std::istringstream output_buffer(tensor_reply.serialized_buffer(),
+                                   std::ios::binary);
+  std::vector<unsigned long> results;
+  deserialize(results, output_buffer);
+  // this particular image is a seven, since the net is trained we might as well
+  // run a prediction
+  EXPECT_EQ(results[0], 7);
 }
 
-TEST_F(TestIntegrationMXNet, ThreadedProcessMultiple_SingleBatch) {
+TEST_F(TestIntegrationDlib, ThreadedProcessMultiple_SingleBatch) {
   std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials());
   std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
@@ -229,20 +256,22 @@ TEST_F(TestIntegrationMXNet, ThreadedProcessMultiple_SingleBatch) {
         std::thread(ThreadProcess, std::ref(stub), msg, std::ref(results[i])));
   }
 
-  int buflen;
   for (int i = 0; i < batch_size; i++) {
     request_threads[i].join();
     TensorMessage &tensor_reply = results[i];
 
-    buflen = tensor_reply.buffer().size();
-    for (int j = 0; j < buflen; j++) {
-      EXPECT_EQ(tensor_reply.buffer(j), 2.f * n_hidden + 1);
-    }
+    std::istringstream output_buffer(tensor_reply.serialized_buffer(),
+                                     std::ios::binary);
+    std::vector<unsigned long> results;
+    deserialize(results, output_buffer);
+    // this particular image is a seven, since the net is trained we might as well
+    // run a prediction
+    EXPECT_EQ(results[0], 7);
     tensor_reply.clear_buffer();
   }
 }
 
-TEST_F(TestIntegrationMXNet, ThreadedProcessMultiple_MultiBatch) {
+TEST_F(TestIntegrationDlib, ThreadedProcessMultiple_MultiBatch) {
   std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials());
   std::unique_ptr<BatchingServer::Stub> stub = BatchingServer::NewStub(channel);
@@ -267,17 +296,18 @@ TEST_F(TestIntegrationMXNet, ThreadedProcessMultiple_MultiBatch) {
         std::thread(ThreadProcess, std::ref(stub), msg, std::ref(results[i])));
   }
 
-  int buflen;
   for (int i = 0; i < batch_size; i++) {
     request_threads[i].join();
     TensorMessage &tensor_reply = results[i];
 
-    buflen = tensor_reply.buffer().size();
-    for (int j = 0; j < buflen; j++) {
-      EXPECT_EQ(tensor_reply.buffer(j), 2.f * n_hidden + 1);
-    }
+    std::istringstream output_buffer(tensor_reply.serialized_buffer(),
+                                     std::ios::binary);
+    std::vector<unsigned long> results;
+    deserialize(results, output_buffer);
+    // this particular image is a seven, since the net is trained we might as well
+    // run a prediction
+    EXPECT_EQ(results[0], 7);
     tensor_reply.clear_buffer();
-    buflen = 0;
   }
 }
 }

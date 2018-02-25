@@ -30,122 +30,172 @@ using grpc::ServerContext;
 using grpc::ServerContext;
 using grpc::Status;
 
+namespace {
+std::string ReadFile_(const std::string &filename) {
+  std::ifstream in_file;
+
+  std::string tmp, out;
+  in_file.open(filename);
+  while (in_file.good()) {
+    std::getline(in_file, tmp);
+    out += tmp + "\n";
+  }
+  in_file.close();
+
+  return out;
+}
+}
+
 namespace Serving {
 
-  TBServer::TBServer(Servable *servable) : servable_(servable) { ; }
+TBServer::TBServer(Servable *servable) : servable_(servable) { ; }
 
-  TBServer::~TBServer() { ; }
+TBServer::~TBServer() { ; }
 
-  grpc::Status TBServer::SetBatchSize(
-      grpc::ServerContext *ctx, const AdminRequest *req, AdminReply *rep) {
-    ReturnCodes code = servable_->SetBatchSize(req->new_batch_size());
+grpc::Status TBServer::SetBatchSize(grpc::ServerContext *ctx,
+                                    const AdminRequest *req, AdminReply *rep) {
+  ReturnCodes code = servable_->SetBatchSize(req->new_batch_size());
 
-    switch (code) {
-      case OK:
-        break;
-      case NEXT_BATCH: {
-        grpc::Status early_exit_status(
-            grpc::UNAVAILABLE,
-            "Batch is already larger than requested size, retry");
-        return early_exit_status;
-      }
-    }
-
-    return grpc::Status::OK;
+  switch (code) {
+  case OK:
+    break;
+  case NEXT_BATCH: {
+    grpc::Status early_exit_status(
+        grpc::UNAVAILABLE,
+        "Batch is already larger than requested size, retry");
+    return early_exit_status;
+  }
+  default: {
+    grpc::Status early_exit_status(grpc::CANCELLED,
+                                   "An error ocurred, try again later");
+    return early_exit_status;
+  }
   }
 
-  Status TBServer::Connect(
-      ServerContext *ctx, const ConnectionRequest *req, ConnectionReply *rep) {
+  return grpc::Status::OK;
+}
 
-    uuid_t uuid;
-    uuid_generate(uuid);
-    char uuid_str[37];
-    uuid_unparse_lower(uuid, uuid_str);
-    users_.emplace(uuid_str);
+Status TBServer::Connect(ServerContext *ctx, const ConnectionRequest *req,
+                         ConnectionReply *rep) {
 
-    rep->set_client_id(uuid_str);
+  uuid_t uuid;
+  uuid_generate(uuid);
+  char uuid_str[37];
+  uuid_unparse_lower(uuid, uuid_str);
+  users_.emplace(uuid_str);
 
-    return Status::OK;
+  rep->set_client_id(uuid_str);
+
+  return Status::OK;
+}
+
+grpc::Status TBServer::Process(ServerContext *ctx, const TensorMessage *req,
+                               TensorMessage *rep) {
+
+  auto user = users_.find(req->client_id());
+  if (user == users_.end()) {
+    grpc::Status early_exit_status(grpc::FAILED_PRECONDITION,
+                                   "Connect not called, client id unknown");
+    return early_exit_status;
   }
 
-  grpc::Status TBServer::Process(
-      ServerContext *ctx, const TensorMessage *req, TensorMessage *rep) {
+  // TODO: make sure that this is all going to the same instance
+  ReturnCodes code = servable_->AddToBatch(*req); // Add to batch and move on
 
-    auto user = users_.find(req->client_id());
-    if (user == users_.end()) {
-      grpc::Status early_exit_status(
-          grpc::FAILED_PRECONDITION, "Connect not called, client id unknown");
-      return early_exit_status;
-    }
-
-    // TODO: make sure that this is all going to the same instance
-    ReturnCodes code = servable_->AddToBatch(*req); // Add to batch and move on
-
-    switch (code) {
-      case OK:
-        break;
-      case NEED_BIND_CALL: {
-        grpc::Status early_exit_status(
-            grpc::FAILED_PRECONDITION, "Bind not called on servable");
-        return early_exit_status;
-      }
-      case SHAPE_INCORRECT: {
-        grpc::Status early_exit_status(
-            grpc::INVALID_ARGUMENT, "Input tensor shape incorrect");
-        return early_exit_status;
-      }
-      case NEXT_BATCH: {
-        grpc::Status early_exit_status(
-            grpc::UNAVAILABLE, "Attempted to add to already full batch");
-        return early_exit_status;
-      }
-      case BATCH_TOO_LARGE: {
-        grpc::Status early_exit_status(
-            grpc::INVALID_ARGUMENT,
-            "Batch request was too large, split into smaller pieces and retry");
-        return early_exit_status;
-      }
-      case NO_SUITABLE_BIND_ARGS:
-        break; // this one won't be thrown by the function
-    }
-
-    code = servable_->GetResult(req->client_id(), rep);
-
-    switch (code) {
-      case OK:
-        break;
-      case NEXT_BATCH: {
-        grpc::Status early_exit_status(
-            grpc::UNAVAILABLE,
-            "Try again later, processing hasn't yet started!");
-        return early_exit_status;
-      }
-    }
-
-    return grpc::Status::OK;
+  switch (code) {
+  case OK:
+    break;
+  case NEED_BIND_CALL: {
+    grpc::Status early_exit_status(grpc::FAILED_PRECONDITION,
+                                   "Bind not called on servable");
+    return early_exit_status;
+  }
+  case SHAPE_INCORRECT: {
+    grpc::Status early_exit_status(grpc::INVALID_ARGUMENT,
+                                   "Input tensor shape incorrect");
+    return early_exit_status;
+  }
+  case NEXT_BATCH: {
+    grpc::Status early_exit_status(grpc::UNAVAILABLE,
+                                   "Attempted to add to already full batch");
+    return early_exit_status;
+  }
+  case BATCH_TOO_LARGE: {
+    grpc::Status early_exit_status(
+        grpc::INVALID_ARGUMENT,
+        "Batch request was too large, split into smaller pieces and retry");
+    return early_exit_status;
+  }
+  case NO_SUITABLE_BIND_ARGS:
+    break; // this one won't be thrown by the function
   }
 
-  void TBServer::StartInsecure(const std::string &server_address) {
-    ServerBuilder builder;
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(this);
-    server_ = builder.BuildAndStart();
+  code = servable_->GetResult(req->client_id(), rep);
 
-    serve_thread_ = std::thread([&]() { server_->Wait(); });
+  switch (code) {
+  case OK:
+    break;
+  case NEXT_BATCH: {
+    grpc::Status early_exit_status(
+        grpc::UNAVAILABLE, "Try again later, processing hasn't yet started!");
+    return early_exit_status;
+  }
+  default: {
+    grpc::Status early_exit_status(grpc::CANCELLED,
+                                   "An error ocurred, try again later");
+    return early_exit_status;
+  }
   }
 
-  void TBServer::Stop() {
-    server_->Shutdown();
-    serve_thread_.join();
+  return grpc::Status::OK;
+}
+
+void TBServer::StartInsecure(const std::string &server_address) {
+  ServerBuilder builder;
+  builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+  builder.RegisterService(this);
+  server_ = builder.BuildAndStart();
+
+  serve_thread_ = std::thread([&]() { server_->Wait(); });
+}
+
+void TBServer::Stop() {
+  server_->Shutdown();
+  serve_thread_.join();
+}
+
+void TBServer::StartSSL(const std::string &server_address,
+                        const std::string &key, const std::string &cert) {
+  ServerBuilder builder;
+
+  bool key_dashes = true;
+  bool cert_dashes = true;
+  for (uint16_t i = 0; i < 5; i++) {
+    key_dashes &= key[i] == '-';
+    cert_dashes &= cert[i] == '-';
   }
 
-  //  void TBServer::StartSSL(const std::string &server_address) {
-  //    ServerBuilder builder;
-  //    builder.AddListeningPort(server_address, grpc::SslServerCredentials());
-  //    builder.RegisterService(this);
-  //    server_ = builder.BuildAndStart();
-  //
-  //    serve_thread_ = std::thread([&](){server_->Wait();});
-  //  }
+  grpc::SslServerCredentialsOptions::PemKeyCertPair pkcp;
+  if (!key_dashes && !cert_dashes)
+    pkcp = {ReadFile_(key), ReadFile_(cert)};
+  if (!key_dashes && cert_dashes)
+    pkcp = {ReadFile_(key), cert};
+  if (key_dashes && !cert_dashes)
+    pkcp = {key, ReadFile_(cert)};
+  if (key_dashes && cert_dashes)
+    pkcp = {key, cert};
+
+  grpc::SslServerCredentialsOptions ssl_opts;
+  ssl_opts.pem_root_certs = "";
+  ssl_opts.pem_key_cert_pairs.push_back(pkcp);
+
+  std::shared_ptr<grpc::ServerCredentials> channel_creds =
+      grpc::SslServerCredentials(ssl_opts);
+  builder.AddListeningPort(server_address, channel_creds);
+  builder.RegisterService(this);
+  server_ = builder.BuildAndStart();
+
+  serve_thread_ = std::thread([&]() { server_->Wait(); });
+}
 
 } // namespace Serving
